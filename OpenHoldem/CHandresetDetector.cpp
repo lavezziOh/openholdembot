@@ -25,6 +25,7 @@
 #include "CSymbolEngineDealerchair.h"
 #include "CSymbolEngineHistory.h"
 #include "CSymbolEngineIsOmaha.h"
+#include "CSymbolEngineIsRush.h"
 #include "CSymbolEngineTableLimits.h"
 #include "CSymbolEngineTime.h"
 #include "CSymbolEngineUserchair.h"
@@ -36,7 +37,8 @@
 
 CHandresetDetector *p_handreset_detector = NULL;
 
-const int kNumberOfHandresetMethods = 9;
+// Number of bits in BitVectorFiringHandresetMethods(), for the log
+const int kNumberOfHandresetMethods = 13;
 const double kMinimumtimeBetweenTwoHeartbeats = 4.0;
 
 CHandresetDetector::CHandresetDetector() {
@@ -61,6 +63,13 @@ CHandresetDetector::CHandresetDetector() {
   _last_showdown_cards_visible = false;
   _buttons_visible = false;
   _last_buttons_visible = false;
+  // The object lives in a memory pool that is not zero-initialized:
+  // every member compared on the first heartbeat must be set here
+  _antes_visible = false;
+  _last_antes_visible = false;
+  _ohreplay_framenumber = kUndefinedZero;
+  _last_ohreplay_framenumber = kUndefinedZero;
+  ClearSeenHandResets();
   for (int i = 0; i<kMaxNumberOfCardsPerPlayer; i++) {
     playercards[i] = CARD_NOCARD;
     last_playercards[i] = CARD_NOCARD;  
@@ -97,8 +106,21 @@ void CHandresetDetector::CalculateIsHandreset() {
   int number_of_methods_firing = bitcount(total_methods_firing);
   write_log(Preferences()->debug_handreset_detector(), "[CHandresetDetector] Number of methods firing last 3 heartbeat2: %i\n",
     number_of_methods_firing);
-  if ((p_engine_container->symbol_engine_time()->elapsedhand() < kMinimumtimeBetweenTwoHeartbeats) 
-      && (p_engine_container->symbol_engine_time()->elapsed() > kMinimumtimeBetweenTwoHeartbeats)) {
+  bool too_shortly_after_last_handreset =
+    (p_engine_container->symbol_engine_time()->elapsedhand() < kMinimumtimeBetweenTwoHeartbeats)
+    && (p_engine_container->symbol_engine_time()->elapsed() > kMinimumtimeBetweenTwoHeartbeats);
+  if (too_shortly_after_last_handreset
+      && (number_of_methods_firing >= 2)
+      && IsUnambiguousNewHandOnFastFoldTable()) {
+    // On rush / zoom tables the next hand can start
+    // less than 4 seconds after the last one (fast fold).
+    // Rejecting it would lose the handreset completely
+    // (the methods only fire on the heartbeat of the change)
+    // and the new hand would be played with the history of the old one.
+    write_log(Preferences()->debug_handreset_detector(), "[CHandresetDetector] Fast handreset accepted on fast-fold table\n");
+    too_shortly_after_last_handreset = false;
+  }
+  if (too_shortly_after_last_handreset) {
     // Prevent multiple fast hearbeats due to lagging casino
     // and too many handreset-events on multiple heartbeats
     // http://www.maxinmontreal.com/forums/viewtopic.php?f=156&t=19938
@@ -176,10 +198,37 @@ bool CHandresetDetector::IsHandresetByDealerChair() {
 	return ishandreset;
 }
 
+bool CHandresetDetector::UserCardsChanged() {
+	// Any changed card counts: a new hand can have the same card
+	// in the same position (about 4% of hands in hold'em)
+	for (int i = 0; i < NumberOfCardsPerPlayer(); ++i) {
+		if (playercards[i] != last_playercards[i]) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool CHandresetDetector::IsUnambiguousNewHandOnFastFoldTable() {
+	if (!p_engine_container->symbol_engine_isrush()->isrush()) {
+		return false;
+	}
+	if (IsHandresetByHandNumber()) {
+		// A new hand number can't appear twice in the same hand
+		return true;
+	}
+	// New cards after the bot already acted (usually: fast fold).
+	// Cards that appear late during the animations of a new hand
+	// (the case the 4-seconds-rule is for) come before any action.
+	CSymbolEngineHistory *history = p_engine_container->symbol_engine_history();
+	return ((history->DidActThisHand() || history->DidFoldThisHand())
+		&& p_table_state->User()->HasKnownCards()
+		&& UserCardsChanged());
+}
+
 bool CHandresetDetector::IsHandresetByUserCards() {
 	bool ishandreset = (p_table_state->User()->HasKnownCards()
-		&& (playercards[0] != last_playercards[0]) 
-		&& (playercards[1] != last_playercards[1]));
+		&& UserCardsChanged());
 	write_log(Preferences()->debug_handreset_detector(), "[CHandresetDetector] Handreset by cards: %s\n",
 		Bool2CString(ishandreset));
 	return ishandreset;
@@ -273,7 +322,9 @@ bool CHandresetDetector::IsHandresetByChangingBlindLevel() {
 }
 
 bool CHandresetDetector::IsHandresetByOHReplayFrameNumber() {
-  bool ishandreset = (-_ohreplay_framenumber < _last_ohreplay_framenumber);
+  // Decreasing frame number: OHReplay started again with the next hand.
+  // (Was "-_ohreplay_framenumber < ...", which fired on every frame.)
+  bool ishandreset = (_ohreplay_framenumber < _last_ohreplay_framenumber);
   write_log(Preferences()->debug_handreset_detector(), "[CHandresetDetector] Handreset by decreasing framenumber of OHReplay: %s\n",
 		Bool2CString(ishandreset));
   return ishandreset;

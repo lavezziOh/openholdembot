@@ -35,6 +35,8 @@ class CHandresetDetector : public CSpaceOptimizedGlobalObject {
  private:
 	bool IsHandresetByDealerChair();
 	bool IsHandresetByUserCards();
+	bool UserCardsChanged();
+	bool IsUnambiguousNewHandOnFastFoldTable();
 	bool IsHandresetByHandNumber();
 	bool IsHandresetByCommunityCards();
 	bool IsHandresetByPotsize();
