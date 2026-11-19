@@ -31,8 +31,13 @@
 #include "CSymbolEngineCasino.h"
 
 double MinimumBetsizeDueToPreviousRaise() {
-	double minimums_swag_amount = (p_engine_container->symbol_engine_chip_amounts()->call() 
+	// Minimum raise-to = largest bet + last raise size = our current bet + call + sraiprev
+	// (our current bet was missing: e.g. big blind at 1/2 facing 6 -> 8 instead of 10)
+	double minimums_swag_amount = (p_engine_container->symbol_engine_chip_amounts()->call()
 		+ p_engine_container->symbol_engine_chip_amounts()->sraiprev());
+	if ((minimums_swag_amount > 0) && p_engine_container->symbol_engine_userchair()->userchair_confirmed()) {
+		minimums_swag_amount += p_table_state->User()->_bet.GetValue();
+	}
 	// If there are no bets and no raises the min-bet is 1 big-blind
 	if (minimums_swag_amount <= 0)	{
 		if (p_engine_container->symbol_engine_tablelimits()->bblind() > 0) 	{

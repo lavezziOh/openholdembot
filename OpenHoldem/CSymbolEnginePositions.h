@@ -42,6 +42,12 @@ public:
 	int betposition()			{ return _betposition;			}
 	int dealposition()			{ return _dealposition;			}
 	int callposition()			{ return _callposition;			}
+public:
+	// Called by the Raisers engine at our turn, when raischair is known for this heartbeat
+	void UpdateAfterRaisers() {
+		CalculatePositionForTheRaiser();
+		CalculatePositionsForTheUserchair();
+	}
 private:
 	void CalculateNChairsDealtLeftRight();
 	void CalculatePositionForTheRaiser();

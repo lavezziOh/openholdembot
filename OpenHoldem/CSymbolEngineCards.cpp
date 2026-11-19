@@ -531,6 +531,7 @@ void CSymbolEngineCards::CalcUnknownCards()
       CardMask_SET(stdCards, card->GetValue());
 			nstdCards++;
       CardMask_SET(commonCards, card->GetValue());
+			ncommonCards++;
 		}
 	}
 
@@ -538,6 +539,10 @@ void CSymbolEngineCards::CalcUnknownCards()
 	_ncardsunknown = kNumberOfCardsPerDeck - _ncardsknown;
 
 	handval_std = Hand_EVAL_N(stdCards, nstdCards);
+	// Pokerval of the current cards (the Pokerval engine runs after this engine,
+	// so its pokerval() is still the one of the previous heartbeat)
+	unsigned int pokerval_now = p_engine_container->symbol_engine_pokerval()->CalculatePokerval(
+		handval_std, nstdCards, &dummy, CARD_NOCARD, CARD_NOCARD);
 	_nouts = 0;
 	_ncardsbetter = 0;
 
@@ -562,13 +567,13 @@ void CSymbolEngineCards::CalcUnknownCards()
 
 				if (BETROUND < kBetroundRiver 
 					&& HandVal_HANDTYPE(handval_std_plus1) > HandVal_HANDTYPE(handval_std) 
-					&& p_engine_container->symbol_engine_pokerval()->CalculatePokerval(handval_std_plus1, nstdCards+1, &dummy, CARD_NOCARD, CARD_NOCARD) > p_engine_container->symbol_engine_pokerval()->pokerval()
+					&& p_engine_container->symbol_engine_pokerval()->CalculatePokerval(handval_std_plus1, nstdCards+1, &dummy, CARD_NOCARD, CARD_NOCARD) > pokerval_now
 					&& HandVal_HANDTYPE(handval_std_plus1) > HandVal_HANDTYPE(handval_common_plus1))
 				{
 					_nouts++;										
 				}
 
-				if (p_engine_container->symbol_engine_pokerval()->CalculatePokerval(handval_common_plus1, ncommonCards+1, &dummy, CARD_NOCARD, CARD_NOCARD) > p_engine_container->symbol_engine_pokerval()->pokerval())
+				if (p_engine_container->symbol_engine_pokerval()->CalculatePokerval(handval_common_plus1, ncommonCards+1, &dummy, CARD_NOCARD, CARD_NOCARD) > pokerval_now)
 				{
 					_ncardsbetter++;							
 				}
@@ -593,6 +598,8 @@ bool CSymbolEngineCards::IsHand(const char *name) {
 
 	// passed in symbol query
 	for (int i=1; i<(int) strlen(name); ++i) {
+		// A hand has only 2 ranks: more ranks would overflow cardrank[2]
+		if ((cardcnt >= 2) && (strchr("23456789TtJjQqKkAa", name[i]) != NULL)) return false;
     if (name[i] >= '2' && name[i] <= '9') {
 			cardrank[cardcnt++] = DigitCharacterToNumber(name[i]);
     } else if (name[i]=='T' || name[i]=='t') {

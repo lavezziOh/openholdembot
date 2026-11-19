@@ -35,16 +35,16 @@ public:
 	void UpdateOnMyTurn();
 	void UpdateOnHeartbeat();
 public:
-	int CalculatePokerval(HandVal hv, int n, int *pcb, int card0, int card1);
+	unsigned int CalculatePokerval(HandVal hv, int n, int *pcb, int card0, int card1);
 public:
 	// Public accessors
 	bool EvaluateSymbol(const CString name, double *result, bool log = false);
 	CString SymbolsProvided();;
 public:
 	// Pokerval
-	int pokerval()			{ return _pokerval; }
-	int pokervalplayer()	{ return _pokervalplayer; }
-	int pokervalcommon()	{ return _pokervalcommon; }
+	unsigned int pokerval()			{ return _pokerval; }
+	unsigned int pokervalplayer()	{ return _pokervalplayer; }
+	unsigned int pokervalcommon()	{ return _pokervalcommon; }
 	int pcbits()			{ return _pcbits; }
 	int npcbits()			{ return bitcount(_pcbits); }
 	// Hand tests
@@ -117,9 +117,9 @@ private:
   int CardMaskToRankBits(CardMask c);
   int SuitBits(CardMask c, int suit);
 private:
-	int _pokerval;
-	int _pokervalplayer;
-	int _pokervalcommon;
+	unsigned int _pokerval;
+	unsigned int _pokervalplayer;
+	unsigned int _pokervalcommon;
 	int _pcbits;
 	int _npcbits;
 private:

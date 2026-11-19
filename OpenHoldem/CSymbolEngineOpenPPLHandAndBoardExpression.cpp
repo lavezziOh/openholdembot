@@ -242,9 +242,16 @@ bool CSymbolEngineOpenPPLHandAndBoardExpression::EvaluateSymbol(const CString na
 			}
 		}	else {
 			// Suited board-expression
-			int rankbits_available = p_engine_container->symbol_engine_pokerval()->srankbitscommon();
-			// Check ranks in expression against available ranks
-			if ((rankbits_to_be_searched & rankbits_available) != rankbits_to_be_searched)
+			// Check ranks in expression against the ranks of every suit on the board
+			bool suited_ranks_on_board = false;
+			for (int suit = StdDeck_Suit_FIRST; suit <= StdDeck_Suit_LAST; ++suit) {
+				int rankbits_available = p_engine_container->symbol_engine_pokerval()->suitbitscommon(suit);
+				if ((rankbits_to_be_searched & rankbits_available) == rankbits_to_be_searched) {
+					suited_ranks_on_board = true;
+					break;
+				}
+			}
+			if (!suited_ranks_on_board)
 			{
 				write_log(Preferences()->debug_hand_and_board_expressions(),
 					"[CSymbolEngineOpenPPLHandAndBoardExpression] No match, because suited rankbits do not fit\n");

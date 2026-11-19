@@ -51,6 +51,7 @@
 #include "CSymbolEngineDealerchair.h"
 #include "CSymbolEngineDebug.h"
 #include "CSymbolEngineHistory.h"
+#include "CSymbolEnginePositions.h"
 #include "CSymbolEngineTableLimits.h"
 #include "CSymbolEngineUserchair.h"
 
@@ -108,6 +109,10 @@ void CSymbolEngineRaisers::UpdateOnMyTurn() {
 
 void CSymbolEngineRaisers::UpdateOnHeartbeat() {
 	CalculateRaisers();
+	if (p_engine_container->symbol_engine_autoplayer()->ismyturn()) {
+		// The Positions engine is updated before this engine and used the raiser of the previous heartbeat
+		p_engine_container->symbol_engine_positions()->UpdateAfterRaisers();
+	}
 }
 
 int CSymbolEngineRaisers::ChairInFrontOfFirstPossibleActor() {
@@ -284,40 +289,12 @@ void CSymbolEngineRaisers::CalculateRaisers() {
 		if ((!p_engine_container->symbol_engine_history()->DidAct()) && (p_engine_container->symbol_engine_autoplayer()->ismyturn())) {
 			write_log(Preferences()->debug_symbolengine(),
 				"[CSymbolEngineRaisers] Updating Firstraiser \n");
-			if (_nopponentstruelyraising > 1) {
+			// The loop runs in action order (from the chair after hero, a full orbit at our turn),
+			// so the first raiser is the one found first. The old re-scan by "smallest bet >= 2bb"
+			// in chair order took a caller of the open (same bet, lower chair number) as first raiser.
+			if (_nopponentstruelyraising == 1) {
 				write_log(Preferences()->debug_symbolengine(),
-					"[CSymbolEngineRaisers] More than one raiser acted before our first orbit \n");
-				int Flag = 0;
-				double MinActualBet = 0;
-
-				for (int h = 0; h < p_tablemap->nchairs(); h++) {
-
-					if (!p_table_state->Player(h)->HasAnyCards())
-						continue;
-
-					if (p_table_state->Player(h)->_bet.GetValue() >= (p_engine_container->symbol_engine_tablelimits()->bblind() * 2) && Flag == 0)
-					{
-						_firstraiser_chair = h;
-						Flag = 1;
-						MinActualBet = p_table_state->Player(h)->_bet.GetValue();
-						write_log(Preferences()->debug_symbolengine(),
-							"[CSymbolEngineRaisers] Rasier detected assigned as Firstraiser %d bet %.2f\n",
-							h, MinActualBet);
-					}
-
-					if ((p_table_state->Player(h)->_bet.GetValue() < MinActualBet) && (p_table_state->Player(h)->_bet.GetValue() >= p_engine_container->symbol_engine_tablelimits()->bblind() * 2) && Flag == 1)
-					{
-						_firstraiser_chair = h;
-						MinActualBet = p_table_state->Player(h)->_bet.GetValue();
-						write_log(Preferences()->debug_symbolengine(),
-							"[CSymbolEngineRaisers] Updating firstraiser %d bet %.2f\n",
-							h, MinActualBet);
-					}
-				}
-			}
-			else {
-				write_log(Preferences()->debug_symbolengine(),
-					"[CSymbolEngineRaisers] FirstRaiser Kundef - Fisrt Riaser to Opponent %i\n", chair);
+					"[CSymbolEngineRaisers] First raiser: opponent %i\n", chair);
 				_firstraiser_chair = chair;
 			}
 		}

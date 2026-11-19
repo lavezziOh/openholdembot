@@ -162,7 +162,7 @@ void CSymbolEngineChipAmounts::CalculatePots() {
 }
 
 void CSymbolEngineChipAmounts::CalculateAmountsToCallToRaise() {
-	int	next_largest_bet = 0;
+	double next_largest_bet = 0;
 	double largest_bet = Largestbet();
   if (p_engine_container->symbol_engine_userchair()->userchair_confirmed()) {
 		_call = largest_bet - p_table_state->User()->_bet.GetValue();

@@ -85,6 +85,8 @@ void CSymbolEnginePokerval::UpdateOnHeartbeat() {
   CalculateCardMasks();
 	CalculateRankBits();
 	CalcPokerValues();
+	// Again: rankbitspoker and srankbitspoker need the pokerval of the current cards
+	CalculateRankBits();
 }
 
 void CSymbolEnginePokerval::PrepareConstantSuitMasks() {
@@ -189,7 +191,7 @@ void CSymbolEnginePokerval::CalcPokerValues() {
     p_table_state->User()->hole_cards(1)->GetValue());
 
   write_log(Preferences()->debug_symbolengine(), "[CSymbolEnginePokerval] handval = %i\n", handval);
-	write_log(Preferences()->debug_symbolengine(), "[CSymbolEnginePokerval] pokerval = %i\n", _pokerval);
+	write_log(Preferences()->debug_symbolengine(), "[CSymbolEnginePokerval] pokerval = %u\n", _pokerval);
 	write_log(Preferences()->debug_symbolengine(), "[CSymbolEnginePokerval] pcbits = %i\n", _pcbits);
 
 	_phandval[BETROUND] = _pokerval & 0xff000000; 
@@ -267,8 +269,8 @@ void CSymbolEnginePokerval::CalculateHandType()
 		{
 			_ishipair = true;
 		}
-		// at least flop seen...
-		else if (nCards >= 5)
+		// at least flop seen... (and a hole card makes the pair, not a paired board)
+		else if ((nCards >= 5) && ((_pcbits & 0x18) != 0))
 		{
 			if ((int)(StdDeck_RANK(HandVal_TOP_CARD(handval))) 
 				>= OpenHoldemRankToStdDeckLibraryRank(rankhicommon()))
@@ -324,13 +326,20 @@ void CSymbolEnginePokerval::CalculateRankBits() {
 	
   _rankbitsplayer = CardMaskToRankBits(_player_cards);
   _rankbitscommon = CardMaskToRankBits(_board_cards);
-	_rankbitspoker = (1<<((_pokerval>>16)&0xf))
-		| (1<<((_pokerval>>12)&0xf)) 
-		| (1<<((_pokerval>>8)&0xf)) 
-		| (1<<((_pokerval>>4)&0xf)) 
-		| (1<<((_pokerval>>0)&0xf)); 
+	// Ranks of the 5 cards of the best hand (pokerval nibbles: 2..14, 1 = ace of a wheel, 0 = unused,
+	// e.g. preflop with 2 cards). Unused nibbles gave bit 0 and srankbitspoker read card rank -2.
+	for (int shift = 16; shift >= 0; shift -= 4) {
+		int nibble = (_pokerval >> shift) & 0xf;
+		if (nibble < 1) continue;
+		_rankbitspoker |= (1 << nibble);
+		int card_rank = (nibble == 1) ? StdDeck_Rank_ACE : (nibble - 2);
+		if ((tsuit >= StdDeck_Suit_FIRST) && (tsuit <= StdDeck_Suit_LAST)
+			  && CardMask_CARD_IS_SET(_all_cards, StdDeck_MAKE_CARD(card_rank, tsuit))) {
+			_srankbitspoker |= (1 << nibble);
+		}
+	}
 	// Take care about ace (low bit)
-	_rankbitspoker |= ((_rankbitspoker&0x4000) ? (1<<1) : 0); 
+	_rankbitspoker |= ((_rankbitspoker&0x4000) ? (1<<1) : 0);
 
 	for (_rank=StdDeck_Rank_LAST; _rank>=StdDeck_Rank_FIRST; _rank--)	{
 		if (CardMask_CARD_IS_SET(_player_cards, StdDeck_MAKE_CARD(_rank, tsuit)))	{
@@ -343,17 +352,6 @@ void CSymbolEnginePokerval::CalculateRankBits() {
 			SetRankBit(&_srankbitscommonp, _rank);
 		}
 	}
-  _srankbitspoker =														
-			(CardMask_CARD_IS_SET(_all_cards, StdDeck_MAKE_CARD(((_pokerval>>16)&0xf)-2, tsuit)) ?
-			 (1<<((_pokerval>>16)&0xf)) : 0) |
-			(CardMask_CARD_IS_SET(_all_cards, StdDeck_MAKE_CARD(((_pokerval>>12)&0xf)-2, tsuit)) ?
-			 (1<<((_pokerval>>12)&0xf)) : 0) |
-			(CardMask_CARD_IS_SET(_all_cards, StdDeck_MAKE_CARD(((_pokerval>>8)&0xf)-2, tsuit)) ?
-			 (1<<((_pokerval>>8)&0xf)) : 0) |
-			(CardMask_CARD_IS_SET(_all_cards, StdDeck_MAKE_CARD(((_pokerval>>4)&0xf)-2, tsuit)) ?
-			 (1<<((_pokerval>>4)&0xf)) : 0) |
-			(CardMask_CARD_IS_SET(_all_cards, StdDeck_MAKE_CARD(((_pokerval>>0)&0xf)-2, tsuit)) ?
-		 (1<<((_pokerval>>0)&0xf)) : 0);
   // Take care about ace (low bit)
 	_srankbitspoker |= ((_srankbitspoker&0x4000) ? (1<<1) : 0); 
 
@@ -423,7 +421,7 @@ bool CSymbolEnginePokerval::IsHigherStraightPossible(HandVal handval)
 	return false;
 }
 
-int CSymbolEnginePokerval::CalculatePokerval(HandVal hv, int n, int *pcb, int card0, int card1)
+unsigned int CSymbolEnginePokerval::CalculatePokerval(HandVal hv, int n, int *pcb, int card0, int card1)
 {
 	double		pv = 0.;
 	int				i = 0, j = 0, k = 0, max = 0, c = 0, flush_suit = 0; //Matrix 2008-06-28
@@ -707,7 +705,7 @@ int CSymbolEnginePokerval::CalculatePokerval(HandVal hv, int n, int *pcb, int ca
 				(StdDeck_RANK(card0) == HandVal_THIRD_CARD(hv) ||
 				 StdDeck_RANK(card1) == HandVal_THIRD_CARD(hv)))
 		{
-			bits |= (1<<1);
+			bits |= (1<<0);
 		}
 		break;
 
@@ -844,7 +842,7 @@ int CSymbolEnginePokerval::CalculatePokerval(HandVal hv, int n, int *pcb, int ca
 	}
 
 	*pcb = bits;
-	return pv;
+	return (unsigned int)pv;
 }
 
 bool CSymbolEnginePokerval::EvaluateSymbol(const CString name, double *result, bool log /* = false */)

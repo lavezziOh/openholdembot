@@ -100,8 +100,12 @@ void CSymbolEnginePositions::CalculateNChairsDealtLeftRight() {
 void CSymbolEnginePositions::CalculatePositionForTheRaiser() {
 	_betpositionrais  = 0;
 	_dealpositionrais = 0;
+	if (p_engine_container->symbol_engine_raisers()->raischair() == kUndefined) {
+		// No raiser: the loop below would never stop and count all players (the dealer position)
+		return;
+	}
 
-	for (int i=DEALER_CHAIR+1; 
+	for (int i=DEALER_CHAIR+1;  
 		  i<=(DEALER_CHAIR+p_tablemap->nchairs());
 		  i++) {
 		int next_chair = i%p_tablemap->nchairs();
