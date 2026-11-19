@@ -22,7 +22,7 @@ HERE = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", 
 sys.path.insert(0, HERE)
 
 APP = "OHSim"
-VERSION = "1.0"
+VERSION = "1.01"
 COPYRIGHT = "Copyright (C) 2026 Lavezzi"
 LICENSE_FILE = os.path.join(HERE, "LICENSE")
 ABOUT = f"""{APP} {VERSION}
