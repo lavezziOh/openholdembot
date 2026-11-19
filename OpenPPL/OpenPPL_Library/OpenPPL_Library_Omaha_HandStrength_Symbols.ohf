@@ -121,7 +121,7 @@ AND RankOfTopPairInHand > SecondTopFlopCard RETURN true FORCE
 ##Omaha_HadSecondOverPairOnTurn##
 WHEN betround < turn RETURN false FORCE
 WHEN IsTurn RETURN HaveSecondOverPair FORCE
-WHEN HadSecondOverPairOnFlop AND ((TurnCard == TopFlopCard) OR (TurnCard < TopFlopCard)) RETURN true FORCE
+WHEN HadSecondOverPairOnFlop AND ((TurnCard == TopFlopCard) OR (TurnCard < RankOfTopPairInHand)) RETURN true FORCE
 
 
 ##Omaha_HadPairOnFlop##
@@ -200,18 +200,27 @@ WHEN Others RETURN false FORCE
 ##Omaha_HadTwoPairOnFlop##
 WHEN IsPreflop RETURN false FORCE
 WHEN IsFlop RETURN HaveTwoPair FORCE
-WHEN FirstHoleCardPairsTheFlop AND SecondHoleCardPairsTheFlop RETURN true FORCE
-WHEN FirstHoleCardPairsTheFlop AND ThirdHoleCardPairsTheFlop RETURN true FORCE
-WHEN FirstHoleCardPairsTheFlop AND FourthHoleCardPairsTheFlop RETURN true FORCE
-WHEN SecondHoleCardPairsTheFlop AND ThirdHoleCardPairsTheFlop RETURN true FORCE
-WHEN SecondHoleCardPairsTheFlop AND FourthHoleCardPairsTheFlop RETURN true FORCE
-WHEN ThirdHoleCardPairsTheFlop AND FourthHoleCardPairsTheFlop RETURN true FORCE
+WHEN BitCount(rankbitsplayer & RankBitsCommonFlop & ConstAllRanksWithoutAceLow) >= 2 RETURN true FORCE
 WHEN Others RETURN false FORCE    
 
 ##Omaha_HaveBackdoorStraightDraw##
-betround == flop
+// Flop: a 5-rank window with 2 of our hole ranks and at least 1 board rank, 3 different ranks at least
+// (2 more board cards complete it; better draws count too)
+WHEN NOT IsFlop RETURN false FORCE
+WHEN (BitCount(rankbitsplayer & 0b111110) >= 2) AND (BitCount(rankbitscommon & 0b111110) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b111110) >= 3) RETURN true FORCE
+WHEN (BitCount(rankbitsplayer & 0b1111100) >= 2) AND (BitCount(rankbitscommon & 0b1111100) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b1111100) >= 3) RETURN true FORCE
+WHEN (BitCount(rankbitsplayer & 0b11111000) >= 2) AND (BitCount(rankbitscommon & 0b11111000) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b11111000) >= 3) RETURN true FORCE
+WHEN (BitCount(rankbitsplayer & 0b111110000) >= 2) AND (BitCount(rankbitscommon & 0b111110000) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b111110000) >= 3) RETURN true FORCE
+WHEN (BitCount(rankbitsplayer & 0b1111100000) >= 2) AND (BitCount(rankbitscommon & 0b1111100000) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b1111100000) >= 3) RETURN true FORCE
+WHEN (BitCount(rankbitsplayer & 0b11111000000) >= 2) AND (BitCount(rankbitscommon & 0b11111000000) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b11111000000) >= 3) RETURN true FORCE
+WHEN (BitCount(rankbitsplayer & 0b111110000000) >= 2) AND (BitCount(rankbitscommon & 0b111110000000) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b111110000000) >= 3) RETURN true FORCE
+WHEN (BitCount(rankbitsplayer & 0b1111100000000) >= 2) AND (BitCount(rankbitscommon & 0b1111100000000) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b1111100000000) >= 3) RETURN true FORCE
+WHEN (BitCount(rankbitsplayer & 0b11111000000000) >= 2) AND (BitCount(rankbitscommon & 0b11111000000000) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b11111000000000) >= 3) RETURN true FORCE
+WHEN (BitCount(rankbitsplayer & 0b111110000000000) >= 2) AND (BitCount(rankbitscommon & 0b111110000000000) >= 1) AND (BitCount((rankbitsplayer | rankbitscommon) & 0b111110000000000) >= 3) RETURN true FORCE
+WHEN Others RETURN false FORCE
 
 ##Omaha_HaveSecondBestKicker##
+(Omaha_MyKicker > 0) AND (Omaha_NumberOfBetterKickers == 1)
 
 
 ##Omaha_HaveSecondBestOverPair##
@@ -240,7 +249,8 @@ WHEN Omaha_NumberOfPossibleBetterStraights = 1 RETURN true FORCE
 
 ##Omaha_HaveSecondOverPair##
 WHEN IsPreflop RETURN false FORCE
-WHEN RankOfTopPairInHand < BestBoardCard AND RankOfTopPairInHand > SecondBestBoardCard RETURN true FORCE	
+WHEN RankOfTopPairInHand < BestBoardCard AND RankOfTopPairInHand > SecondBestBoardCard RETURN true FORCE
+WHEN RankOfBottomPairInHand > 0 AND RankOfBottomPairInHand < BestBoardCard AND RankOfBottomPairInHand > SecondBestBoardCard RETURN true FORCE	
 
 
 ##Omaha_HaveSecondTopSet##
@@ -251,6 +261,7 @@ OR RankOfBottomPairInHand == SecondBestBoardCard) RETURN true FORCE
 
 
 ##Omaha_HaveThirdBestKicker##
+(Omaha_MyKicker > 0) AND (Omaha_NumberOfBetterKickers == 2)
 
 
 ##Omaha_HaveThirdBestOverPair##
@@ -261,6 +272,7 @@ WHEN hand$QQ AND (BestBoardCard < queen) RETURN true FORCE
 ##Omaha_HaveThirdOverPair##
 WHEN IsPreflop RETURN false FORCE
 WHEN (RankOfTopPairInHand < SecondBestBoardCard) AND (RankOfTopPairInHand > ThirdBestBoardCard) RETURN true FORCE
+WHEN (RankOfBottomPairInHand > 0) AND (RankOfBottomPairInHand < SecondBestBoardCard) AND (RankOfBottomPairInHand > ThirdBestBoardCard) RETURN true FORCE
 
 ##Omaha_HaveThirdTopSet##
 WHEN IsPreflop RETURN false FORCE
@@ -271,6 +283,7 @@ AND (RankOfTopPairInHand == ThirdBestBoardCard OR RankOfBottomPairInHand == Thir
 ##Omaha_HaveFourthOverPair##
 WHEN IsPreflop RETURN false FORCE
 WHEN (RankOfTopPairInHand < ThirdBestBoardCard) AND (RankOfTopPairInHand > FourthBestBoardCard) RETURN true FORCE
+WHEN (RankOfBottomPairInHand > 0) AND (RankOfBottomPairInHand < ThirdBestBoardCard) AND (RankOfBottomPairInHand > FourthBestBoardCard) RETURN true FORCE
 
 ##Omaha_HaveFourthTopSet##
 WHEN IsPreflop RETURN false FORCE
@@ -281,9 +294,11 @@ AND (RankOfTopPairInHand == FourthBestBoardCard OR RankOfBottomPairInHand == Fou
 ##Omaha_HaveFifthOverPair##
 WHEN IsPreflop RETURN false FORCE
 WHEN (RankOfTopPairInHand < FourthBestBoardCard) AND (RankOfTopPairInHand > FifthBestBoardCard) RETURN true FORCE
+WHEN (RankOfBottomPairInHand > 0) AND (RankOfBottomPairInHand < FourthBestBoardCard) AND (RankOfBottomPairInHand > FifthBestBoardCard) RETURN true FORCE
 
 
 ##Omaha_HaveBestKicker##
+(Omaha_MyKicker > 0) AND (Omaha_NumberOfBetterKickers == 0)
 
 
 
@@ -317,16 +332,16 @@ WHEN NOT Omaha_HaveTwoPair RETURN false FORCE
 WHEN HaveBottomPair AND HaveSecondBottomPair RETURN true FORCE
 
 ##HaveTwoPairOverTopPairOnBoard##
-BitCount[((rankbitsplayer BitAnd rankbitscommon) >> RankOfTopPairOnBoard) >= 2]
+BitCount((rankbitsplayer BitAnd rankbitscommon) >> (RankOfTopPairOnBoard + 1)) >= 2
 
 ##Omaha_HaveDoubleGutshotDraw##
 Omaha_StraightDraw_Outs >= 8
 
 ##Omaha_FlushDraw_Counter##
-   (BitCount(suitbitsplayer_clubs BitAnd ConstAllRanksWithoutAceLow) >= 2 & BitCount(suitbitscommon_clubs BitAnd ConstAllRanksWithoutAceLow)    == 2 ? 1 : 0)
-+ (BitCount(suitbitsplayer_diamonds BitAnd ConstAllRanksWithoutAceLow) >= 2 & BitCount(suitbitscommon_diamonds BitAnd ConstAllRanksWithoutAceLow) == 2 ? 1 : 0)
-+ (BitCount(suitbitsplayer_hearts BitAnd ConstAllRanksWithoutAceLow) >= 2 & BitCount(suitbitscommon_hearts BitAnd ConstAllRanksWithoutAceLow)   == 2 ? 1 : 0)
-+ (BitCount(suitbitsplayer_spades BitAnd ConstAllRanksWithoutAceLow) >= 2 & BitCount(suitbitscommon_spades BitAnd ConstAllRanksWithoutAceLow)    == 2 ? 1 : 0)
+   (BitCount(suitbitsplayer_clubs BitAnd ConstAllRanksWithoutAceLow) >= 2 & BitCount(suitbitscommon_clubs BitAnd ConstAllRanksWithoutAceLow)    >= 2 ? 1 : 0)
++ (BitCount(suitbitsplayer_diamonds BitAnd ConstAllRanksWithoutAceLow) >= 2 & BitCount(suitbitscommon_diamonds BitAnd ConstAllRanksWithoutAceLow) >= 2 ? 1 : 0)
++ (BitCount(suitbitsplayer_hearts BitAnd ConstAllRanksWithoutAceLow) >= 2 & BitCount(suitbitscommon_hearts BitAnd ConstAllRanksWithoutAceLow)   >= 2 ? 1 : 0)
++ (BitCount(suitbitsplayer_spades BitAnd ConstAllRanksWithoutAceLow) >= 2 & BitCount(suitbitscommon_spades BitAnd ConstAllRanksWithoutAceLow)    >= 2 ? 1 : 0)
 
 
 ##Omaha_HaveFlushDraw##
@@ -339,6 +354,8 @@ Omaha_FlushDraw_Counter == 2
 (HaveSet AND PairOnBoard)
 OR (RankOfTopPairInHand > 0 AND TripsOnBoard)
 OR (HaveTrips AND BitCount(rankbitsplayer & rankbitscommon & ConstAllRanksWithoutAceLow)>=2)
+// quads count as a full house too (as in Hold'em)
+OR Omaha_HaveQuads
 
 ##Omaha_HaveNutStraight##
 WHEN NOT Omaha_HaveStraight RETURN false FORCE
@@ -346,9 +363,16 @@ WHEN Omaha_NumberOfPossibleBetterStraights = 0 RETURN true FORCE
 
 
 ##Omaha_MyKicker##
+// One pair or trips made with one hole card: the kicker is our highest other hole card
+// that is not on the board (the best hand uses exactly 2 hole cards).
+WHEN (Omaha_KickerPairRank > 0) AND (Omaha_KickerRank > 0) RETURN Omaha_KickerRank FORCE
+WHEN Others RETURN 0 FORCE
 
 
 ##Omaha_NumberOfBetterKickers##
+// Ranks above our kicker that are neither on the board nor the rank of our pair
+WHEN (Omaha_MyKicker <= 0) RETURN 99 FORCE
+WHEN Others RETURN [(ace - Omaha_MyKicker) - BitCount((rankbitscommon BitOr (1 << Omaha_KickerPairRank)) >> (Omaha_MyKicker + 1))] FORCE
 
 
 ##Omaha_HaveNutStraightDraw##
@@ -382,7 +406,7 @@ WHEN RankOfBottomPairOnBoard == RankOfBottomPairInHand RETURN true FORCE
 
 ##Omaha_HaveNutQuads##
 WHEN NOT HaveQuads RETURN false FORCE
-WHEN (HaveQuads AND TripsOnBoard) RETURN true FORCE
+WHEN (HaveQuads AND TripsOnBoard AND (RankOfTopPairOnBoard <= RankTripsOnBoard)) RETURN true FORCE
 WHEN NOT PairInHand RETURN false FORCE
 WHEN (RankOfTopPairInHand == RankOfTopPairOnBoard) RETURN true FORCE
 WHEN (RankOfBottomPairInHand == RankOfTopPairOnBoard) RETURN true FORCE
@@ -431,7 +455,8 @@ OR RankOfFourthHoleCard == RankOfTopPairOnBoard RETURN true FORCE
 Omaha_HaveTopTrips OR Omaha_HaveBottomTrips
 
 ##Omaha_HaveStraightDraw##
-Omaha_StraightDraw_Outs > 0
+// As in Hold'em: open-ended or double gutshot (8+ outs); a gutshot alone is HaveInsideStraightDraw
+Omaha_StraightDraw_Outs >= 8
 
 ##Omaha_HaveTopNonBoardPairedPair##
 WHEN IsPreflop RETURN false FORCE
@@ -451,6 +476,8 @@ WHEN HaveTopPair AND HaveSecondTopPair RETURN true FORCE
 ##Omaha_HaveTwoPair##
 // At least 2 of our cards must pair the board
 WHEN NOT [BitCount(rankbitsplayer & rankbitscommon & ConstAllRanksWithoutAceLow) >= 2] RETURN false FORCE
+// Full house (or quads) with the board pair: a better hand counts too
+WHEN Omaha_HaveFullHouse RETURN true FORCE
 // Check for higher pairs on board that devalue our "three pairs"
 WHEN PairOnBoard AND NOT HaveTwoPairOverTopPairOnBoard RETURN false FORCE
 WHEN Others RETURN true FORCE
@@ -487,8 +514,8 @@ Omaha_HaveStraightDraw AND NOT Omaha_HaveNutStraightDraw
 ]
 
 ##Omaha_HaveUnderPair##
-RankOfTopPairInHand > 0
-AND RankOfTopPairInHand < ranklocommon
+   [RankOfTopPairInHand > 0 AND RankOfTopPairInHand < ranklocommon]
+OR [RankOfBottomPairInHand > 0 AND RankOfBottomPairInHand < ranklocommon]
 
 ##Omaha_HighCardOfOurUnderStraight##
 [ (BitCount(rankbitscommon & 0b111000000000000)==3) AND (BitCount(rankbitsplayer & 0b000110000000000)==2) AND (BitCount(rankbits & 0b111110000000000)=5) ] ? jack :
@@ -1285,7 +1312,17 @@ WHEN Omaha_HighCardOfOurStraightFlush >= Five RETURN true FORCE
 // The logic adapted from HoldEm library
 WHEN NOT Omaha_HaveStraightFlush RETURN HINT_You_Dont_Have_a_StraightFlush__Dont_Call_This_Function FORCE
 WHEN (Omaha_HighCardOfOurStraightFlush == ace) RETURN false FORCE
-WHEN (BitCount((Omaha_SrankBitsCommon_For_MadeFlush >> Omaha_SrankHiPlayer_For_MadeFlush) BitAnd 0b111110) >= 3) RETURN true FORCE
+// A higher 5-rank window with 3 board cards of the suit: someone can hold the 2 missing cards
+WHEN (Omaha_HighCardOfOurStraightFlush < 6) AND (BitCount(Omaha_SrankBitsCommon_For_MadeFlush BitAnd 0b1111100) >= 3) RETURN true FORCE
+WHEN (Omaha_HighCardOfOurStraightFlush < 7) AND (BitCount(Omaha_SrankBitsCommon_For_MadeFlush BitAnd 0b11111000) >= 3) RETURN true FORCE
+WHEN (Omaha_HighCardOfOurStraightFlush < 8) AND (BitCount(Omaha_SrankBitsCommon_For_MadeFlush BitAnd 0b111110000) >= 3) RETURN true FORCE
+WHEN (Omaha_HighCardOfOurStraightFlush < 9) AND (BitCount(Omaha_SrankBitsCommon_For_MadeFlush BitAnd 0b1111100000) >= 3) RETURN true FORCE
+WHEN (Omaha_HighCardOfOurStraightFlush < 10) AND (BitCount(Omaha_SrankBitsCommon_For_MadeFlush BitAnd 0b11111000000) >= 3) RETURN true FORCE
+WHEN (Omaha_HighCardOfOurStraightFlush < 11) AND (BitCount(Omaha_SrankBitsCommon_For_MadeFlush BitAnd 0b111110000000) >= 3) RETURN true FORCE
+WHEN (Omaha_HighCardOfOurStraightFlush < 12) AND (BitCount(Omaha_SrankBitsCommon_For_MadeFlush BitAnd 0b1111100000000) >= 3) RETURN true FORCE
+WHEN (Omaha_HighCardOfOurStraightFlush < 13) AND (BitCount(Omaha_SrankBitsCommon_For_MadeFlush BitAnd 0b11111000000000) >= 3) RETURN true FORCE
+WHEN (Omaha_HighCardOfOurStraightFlush < 14) AND (BitCount(Omaha_SrankBitsCommon_For_MadeFlush BitAnd 0b111110000000000) >= 3) RETURN true FORCE
+WHEN Others RETURN false FORCE
 
 
 ##Omaha_HaveNutStraightFlush##
@@ -1518,3 +1555,23 @@ RankBitsPlayerWithoutTopBit BitAnd (BitNot SecondTopBitOfRankBitsPlayer)
 // Last two bits are ace (low) and unused.
 // Both ignored.
 -1
+
+// Omaha kicker helpers: rank of our highest hole card that pairs the board,
+// and our highest hole card of another rank that is not on the board
+##Omaha_KickerPairRankA##
+(((((rankbitscommon >> RankOfFirstHoleCard) BitAnd 1) == 1) ? RankOfFirstHoleCard : 0) > ((((rankbitscommon >> RankOfSecondHoleCard) BitAnd 1) == 1) ? RankOfSecondHoleCard : 0)) ? ((((rankbitscommon >> RankOfFirstHoleCard) BitAnd 1) == 1) ? RankOfFirstHoleCard : 0) : ((((rankbitscommon >> RankOfSecondHoleCard) BitAnd 1) == 1) ? RankOfSecondHoleCard : 0)
+
+##Omaha_KickerPairRankB##
+(((((rankbitscommon >> RankOfThirdHoleCard) BitAnd 1) == 1) ? RankOfThirdHoleCard : 0) > ((((rankbitscommon >> RankOfFourthHoleCard) BitAnd 1) == 1) ? RankOfFourthHoleCard : 0)) ? ((((rankbitscommon >> RankOfThirdHoleCard) BitAnd 1) == 1) ? RankOfThirdHoleCard : 0) : ((((rankbitscommon >> RankOfFourthHoleCard) BitAnd 1) == 1) ? RankOfFourthHoleCard : 0)
+
+##Omaha_KickerPairRank##
+(Omaha_KickerPairRankA > Omaha_KickerPairRankB) ? Omaha_KickerPairRankA : Omaha_KickerPairRankB
+
+##Omaha_KickerRankA##
+((((((rankbitscommon >> RankOfFirstHoleCard) BitAnd 1) == 0) AND (RankOfFirstHoleCard != Omaha_KickerPairRank)) ? RankOfFirstHoleCard : 0) > (((((rankbitscommon >> RankOfSecondHoleCard) BitAnd 1) == 0) AND (RankOfSecondHoleCard != Omaha_KickerPairRank)) ? RankOfSecondHoleCard : 0)) ? (((((rankbitscommon >> RankOfFirstHoleCard) BitAnd 1) == 0) AND (RankOfFirstHoleCard != Omaha_KickerPairRank)) ? RankOfFirstHoleCard : 0) : (((((rankbitscommon >> RankOfSecondHoleCard) BitAnd 1) == 0) AND (RankOfSecondHoleCard != Omaha_KickerPairRank)) ? RankOfSecondHoleCard : 0)
+
+##Omaha_KickerRankB##
+((((((rankbitscommon >> RankOfThirdHoleCard) BitAnd 1) == 0) AND (RankOfThirdHoleCard != Omaha_KickerPairRank)) ? RankOfThirdHoleCard : 0) > (((((rankbitscommon >> RankOfFourthHoleCard) BitAnd 1) == 0) AND (RankOfFourthHoleCard != Omaha_KickerPairRank)) ? RankOfFourthHoleCard : 0)) ? (((((rankbitscommon >> RankOfThirdHoleCard) BitAnd 1) == 0) AND (RankOfThirdHoleCard != Omaha_KickerPairRank)) ? RankOfThirdHoleCard : 0) : (((((rankbitscommon >> RankOfFourthHoleCard) BitAnd 1) == 0) AND (RankOfFourthHoleCard != Omaha_KickerPairRank)) ? RankOfFourthHoleCard : 0)
+
+##Omaha_KickerRank##
+(Omaha_KickerRankA > Omaha_KickerRankB) ? Omaha_KickerRankA : Omaha_KickerRankB

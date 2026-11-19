@@ -1167,6 +1167,8 @@ rankbitscommon & ConstAllRanksWithoutAceLow
 WHEN PairInHand RETURN false FORCE
 WHEN NOT FirstHoleCardPairsTheBoard RETURN false FORCE
 WHEN NOT SecondHoleCardPairsTheBoard RETURN false FORCE
+// Our cards pair the board pair: full house, a better hand counts too (85 on 8-8-5)
+WHEN HaveFullHouse RETURN true FORCE
 // Check for higher pairs on board that devalue our "three pairs"
 WHEN RankOfTopPairOnBoard > rankloplayer RETURN false FORCE
 WHEN Others RETURN true FORCE

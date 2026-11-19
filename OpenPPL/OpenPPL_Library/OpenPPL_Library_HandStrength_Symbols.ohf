@@ -348,7 +348,7 @@ WHEN hand$KK AND RankTripsOnBoard==ace RETURN true FORCE
 ##HaveNothing##
 WHEN HaveOverPairOrBetter RETURN false FORCE
 WHEN HavePair RETURN false FORCE
-WHEN (Overcards == 2) RETURN false FORCE
+WHEN (Overcards >= 2) RETURN false FORCE
 WHEN HaveBackdoorFlushDraw RETURN false FORCE
 WHEN HaveStraightDraw RETURN false FORCE
 WHEN HaveInsideStraightDraw RETURN false FORCE
@@ -401,7 +401,7 @@ WHEN isomaha RETURN Omaha_HaveInsideStraightDraw FORCE
 WHEN Others RETURN HoldEm_HaveInsideStraightDraw FORCE
 
 ##HaveNuts##
-WHEN ismyturn and (nhandshi == 0) RETURN true FORCE
+WHEN ismyturn and (nhandshi == 0) AND NOT isomaha RETURN true FORCE
 // Above code for not my turn
 WHEN HaveNutStraightFlush RETURN true FORCE
 WHEN StraightFlushPossibleByOthers RETURN false FORCE

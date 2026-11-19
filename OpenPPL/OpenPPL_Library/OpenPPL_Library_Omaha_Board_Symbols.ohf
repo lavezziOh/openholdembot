@@ -98,8 +98,8 @@ OR BitCount(suitbitscommon_hearts  & ConstAllRanksWithoutAceLow) >= 3
 OR BitCount(suitbitscommon_spades  & ConstAllRanksWithoutAceLow) >= 3
 
 ##Omaha_FlushDrawPossible##
-   BitCount(suitbitscommon_clubs    & ConstAllRanksWithoutAceLow) == 2
-OR BitCount(suitbitscommon_diamonds & ConstAllRanksWithoutAceLow) == 2
-OR BitCount(suitbitscommon_hearts   & ConstAllRanksWithoutAceLow) == 2
-OR BitCount(suitbitscommon_spades   & ConstAllRanksWithoutAceLow) == 2
+   BitCount(suitbitscommon_clubs    & ConstAllRanksWithoutAceLow) >= 2
+OR BitCount(suitbitscommon_diamonds & ConstAllRanksWithoutAceLow) >= 2
+OR BitCount(suitbitscommon_hearts   & ConstAllRanksWithoutAceLow) >= 2
+OR BitCount(suitbitscommon_spades   & ConstAllRanksWithoutAceLow) >= 2
 
