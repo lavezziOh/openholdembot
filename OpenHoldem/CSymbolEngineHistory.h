@@ -54,7 +54,16 @@ class CSymbolEngineHistory: public CVirtualSymbolEngine {
 	int didchec(int betround)			{ return ((_autoplayer_actions[betround][k_autoplayer_function_check] > 0) ? 1:0) ; }
 	int didcall(int betround)			{ return _autoplayer_actions[betround][k_autoplayer_function_call]; }
 	int didrais(int betround)			{ return _autoplayer_actions[betround][k_autoplayer_function_raise]; }
-	int didswag(int betround)			{ return _autoplayer_actions[betround][k_autoplayer_function_betsize]; }
+	// Bets of a fraction of the pot (RaisePot, RaiseHalfPot, ...) are sized bets too:
+	// they were counted nowhere, so OpenPPL symbols like BotsActionsOnThisRound, BotRaisedOnFlop
+	// and the history counters (Raises, ...) missed them.
+	int didswag(int betround) {
+		int n = _autoplayer_actions[betround][k_autoplayer_function_betsize];
+		for (int code = k_autoplayer_function_betpot_2_1; code <= k_autoplayer_function_betpot_1_4; ++code) {
+			n += _autoplayer_actions[betround][code];
+		}
+		return n;
+	}
 	int didfold(int betround)			{ return _autoplayer_actions[betround][k_autoplayer_function_fold]; }
 	int didalli(int betround)			{ return _autoplayer_actions[betround][k_autoplayer_function_allin]; }
 	int prevaction()			    	{ return _prevaction; }
