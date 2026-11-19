@@ -1,7 +1,7 @@
 # OHSim - No-Limit Hold'em cash simulator for OpenHoldem / OpenPPL profiles
 
 OHSim plays OpenHoldem profiles (`.ohf`, OpenPPL and Shanky-import mode) against each other
-on a No-Limit Hold'em cash table with 2 to 9 seats (Pot-Limit Omaha is supported too).
+on a No-Limit Hold'em cash table with 2 to 10 seats (Pot-Limit Omaha is supported too).
 It evaluates the profiles with the same rules as OpenHoldem (operator precedence, `WHEN`,
 memory symbols, `hand$`/`board$`, lists) and the OpenPPL library shipped in this repository,
 so you can test a bot for hundreds of thousands of hands in minutes instead of playing it.

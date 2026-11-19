@@ -1,4 +1,4 @@
-"""No-Limit Hold'em cash-game engine (2..9 seats).
+"""No-Limit Hold'em cash-game engine (2..10 seats; also Pot-Limit Omaha).
 
 Chairs are numbered 0..n-1 clockwise. Amounts are floats in chips.
 Players implement:
