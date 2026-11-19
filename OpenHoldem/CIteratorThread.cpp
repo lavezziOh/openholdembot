@@ -93,6 +93,7 @@ unsigned int ocard[MAX_OPPONENTS*kNumberOfCardsPerPlayerHoldEm];
 CardMask     addlcomCards;
 CardMask     evalCards = {0}, opp_evalCards = {0};
 int          _willplay, _wontplay, _mustplay, _topclip;
+int          _opponents_dealt = 0;   // hands dealt by the enhanced (prw1326) dealing in this iteration
 int          _nplCards, _ncomCards;
 double       _win, _tie, _los;
 
@@ -141,6 +142,13 @@ void CIteratorThread::RestartPrWinComputations() {
   InitIteratorLoop();
   ResetIteratorVars();
 	ResetGlobalVariables();
+  // ResetIteratorVars() set the counter to 0, i.e. "not working":
+  // until the thread picked up the new computation (it sleeps up to 250 ms)
+  // the autoplayer could take a final answer with prwin = 0.
+  // Mark the computation as started; the thread sets the counter itself when it begins.
+  if (_iterations_required > 1) {
+    _iterations_calculated = 1;
+  }
 }
 
 void CIteratorThread::AdjustPrwinVariablesIfNecessary() {
@@ -193,6 +201,10 @@ UINT CIteratorThread::IteratorThreadFunction(LPVOID pParam) {
 	  // At this point, the iterator thread starts working on a new hand
     _iterations_calculated = 1;  // Set to 1 so it's clear the thread is busy
     _prwin = _prlos = _prtie = 0;
+    // Error code of the enhanced (prw1326) dealing: must be reset for every new computation,
+    // otherwise one failure (range of dead cards only) skipped the final update of all
+    // following computations and left prwin at 0.
+    enhanced_dealing_return = 0;
     if (!p_engine_container->symbol_engine_autoplayer()->ismyturn()) {
       // Not my turn;
       // Nothing to simulate
@@ -260,7 +272,14 @@ UINT CIteratorThread::IteratorThreadFunction(LPVOID pParam) {
 		  // - for win/tie, we need to wait until we scan them all
 		  opp_pokvalmax = 0;
 		  hand_lost = false;
-		  for (int i=0; i<_nopponents; i++) {
+		  // The enhanced dealing deals one weighted hand per playing opponent
+		  // (plus random hands up to f$prwin_number_of_opponents):
+		  // evaluate all of them, never cards that were not dealt in this iteration.
+		  int opponents_to_evaluate = _nopponents;
+		  if (UseEnhancedPrWin() && (_opponents_dealt > opponents_to_evaluate)) {
+			  opponents_to_evaluate = _opponents_dealt;
+		  }
+		  for (int i=0; i<opponents_to_evaluate; i++) {
 			  CardMask_RESET(opp_evalCards);
 			  CardMask_OR(opp_evalCards, pParent->_comCards, addlcomCards);
 			  CardMask_SET(opp_evalCards, ocard[i*2]);
@@ -325,9 +344,16 @@ void CIteratorThread::UpdateIteratorVarsForDisplay() {
 	if (IteratorThreadComplete()
 		|| ((_iterations_calculated % 1000 == 0) && (_iterations_calculated >= 1000)))
 	{
-		_prwin = _win / (double) _iterations_calculated;
-		_prtie = _tie / (double) _iterations_calculated;
-		_prlos = _los / (double) _iterations_calculated;
+		// Divide by the number of simulated hands: the main loop starts counting at 1,
+		// so _iterations_calculated is one more than the hands evaluated
+		// (prwin + prtie + prlos was 0.999 with 1000 iterations).
+		double hands_evaluated = _win + _tie + _los;
+		if (hands_evaluated <= 0) {
+			return;
+		}
+		_prwin = _win / hands_evaluated;
+		_prtie = _tie / hands_evaluated;
+		_prlos = _los / hands_evaluated;
 		write_log(Preferences()->debug_prwin(), "[PrWinThread] Progress: %d %.3f %.3f %.3f\n", 
 			_iterations_calculated, _prwin, _prtie, _prlos);
     p_openholdem_statusbar->SetPrWin(_prwin, _prtie, _prlos);
@@ -755,6 +781,20 @@ int CIteratorThread::EnhancedDealingAlgorithm() {
 			}//end of eachPossibleHand
 		}//end of random_weighted_hand_was_found
 	} //end of eachPlayer
+
+	// f$prwin_number_of_opponents may ask for more opponents than are playing
+	// (default: nopponentsplaying + 1). The evaluation used ocard[] entries that were
+	// never dealt here (zeros or cards of an earlier iteration, possibly duplicates):
+	// give the extra opponents random hands, as the standard prwin does.
+	while ((k / 2 < _nopponents) && (k + 1 < MAX_OPPONENTS * kNumberOfCardsPerPlayerHoldEm)) {
+		card = GetRandomCard();
+		CardMask_SET(usedCards, card);
+		ocard[k++] = card;
+		card = GetRandomCard();
+		CardMask_SET(usedCards, card);
+		ocard[k++] = card;
+	}
+	_opponents_dealt = k / 2;
 
 	// additional common cards
 	CardMask_RESET(addlcomCards);

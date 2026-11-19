@@ -95,8 +95,18 @@ EXE_IMPLEMENTS double GetSymbol(const char* name_of_single_symbol__not_expressio
     // Nothing better to do, as we already evaluate bot-logic,
     // so we can't continue with another heartbeat or something else.
     // http://www.maxinmontreal.com/forums/viewtopic.php?f=111&t=19012
-    while (!p_iterator_thread->IteratorThreadComplete()) {
+    // The thread does not compute when it is not our turn (or without opponents):
+    // then the computation never completes and this loop hung OpenHoldem.
+    // Give up after 10 seconds; prwin then keeps its last value.
+    const int kMaxRecalcWaitMilliseconds = 10000;
+    int waited = 0;
+    while (!p_iterator_thread->IteratorThreadComplete()
+        && (waited < kMaxRecalcWaitMilliseconds)) {
       Sleep(100);
+      waited += 100;
+    }
+    if (!p_iterator_thread->IteratorThreadComplete()) {
+      write_log(true, "[UserDLL] cmd$recalc: prwin not completed after %i ms, continuing\n", waited);
     }
     return 0;
   }

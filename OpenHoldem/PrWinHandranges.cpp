@@ -80,7 +80,12 @@ bool IsHandInWeightedRange(const int card1, const int card2,
 	// We now handle the probability slopes
 	if (hrank <= topclip) //handle the good cards not likely to be one-betted with
 	{
-		int randomized_topclip = topclip * (1 - rand());
+		// rand() is an integer 0..RAND_MAX: "1 - rand()" was <= 0 for almost every value,
+		// so every hand above topclip got accepted and topclip had no effect.
+		// Use a random fraction in [0, 1) instead: the acceptance probability now rises
+		// from 0 (best hand) to 1 (hand rank = topclip), as the slope in the picture above.
+		double random_fraction = rand() / (RAND_MAX + 1.0);
+		int randomized_topclip = int(topclip * (1.0 - random_fraction));
 		return (hrank > randomized_topclip);
 	}
 
