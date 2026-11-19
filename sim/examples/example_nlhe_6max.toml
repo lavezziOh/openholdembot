@@ -1,0 +1,35 @@
+# python -m ohsim.run examples/example_nlhe_6max.toml 20000 -j 4
+# Pop_book (a TAG written from a strategy book) against OpenHoldem's default bot.
+# Replace a profile with your own .ohf to test it.
+[table]
+hands = 20000
+sb = 0.5
+bb = 1.0
+buyin = 100
+rake = 0.05
+rake_cap = 3.0
+seed = 1
+
+[[player]]
+name = "Book_1"
+profile = 'profiles/book/Pop_book.ohf'
+
+[[player]]
+name = "Default_1"
+profile = ''
+
+[[player]]
+name = "Book_2"
+profile = 'profiles/book/Pop_book.ohf'
+
+[[player]]
+name = "Default_2"
+profile = ''
+
+[[player]]
+name = "Book_3"
+profile = 'profiles/book/Pop_book.ohf'
+
+[[player]]
+name = "Default_3"
+profile = ''

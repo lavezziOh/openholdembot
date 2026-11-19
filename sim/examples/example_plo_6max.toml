@@ -1,0 +1,35 @@
+# python -m ohsim.run examples/example_plo_6max.toml 5000 -j 4
+[table]
+game = "plo"       # Pot-Limit Omaha (4 hole cards); default "nlhe"
+hands = 5000
+sb = 0.5
+bb = 1.0
+buyin = 100
+rake = 0.05
+rake_cap = 5.0
+max_stack = 100
+seed = 1
+
+[[player]]
+name = "PLO_1"
+profile = 'examples/Example_PLO.ohf'
+
+[[player]]
+name = "PLO_2"
+profile = 'examples/Example_PLO.ohf'
+
+[[player]]
+name = "PLO_3"
+profile = 'examples/Example_PLO.ohf'
+
+[[player]]
+name = "PLO_4"
+profile = 'examples/Example_PLO.ohf'
+
+[[player]]
+name = "PLO_5"
+profile = 'examples/Example_PLO.ohf'
+
+[[player]]
+name = "PLO_6"
+profile = 'examples/Example_PLO.ohf'

@@ -1,0 +1,26 @@
+// OHSim example bot for Pot-Limit Omaha (OH-script calling the OpenPPL library). GPL v3 or later.
+// OpenHoldem computes prwin and pokerval for Hold'em only, so Omaha bots use the
+// OpenPPL hand-strength functions (HaveNuts, HaveTopSet, HaveNutFlushDraw, ...),
+// which switch to their Omaha versions when isomaha = 1.
+// Return values: Fold, Check, Call, RaisePot (= maximum in pot limit), RaiseHalfPot, ...
+
+##f$preflop##
+  (hand$AA)                                                        ? RaisePot :
+  (hand$KK OR hand$AKQJ OR hand$KQJT OR hand$QQ) && call <= 4 * bblind ? Call :
+  (hand$AKsuited OR hand$JT98) && call <= 1 * bblind                ? Call :
+  Fold
+
+##f$flop##
+  (HaveNuts OR HaveTopSet)                                          ? RaisePot :
+  (HaveSet OR HaveTopTwoPair OR HaveNutFlushDraw OR HaveNutStraightDraw) ? Call :
+  Check
+
+##f$turn##
+  (HaveNuts)                                                        ? RaisePot :
+  (HaveSet OR HaveNutFlushDraw OR HaveNutStraightDraw OR HaveFlush OR HaveStraight) && call <= 0.5 * pot ? Call :
+  Check
+
+##f$river##
+  (HaveNuts)                                                        ? RaisePot :
+  (HaveStraight OR HaveFlush OR HaveFullHouse) && call <= 0.5 * pot ? Call :
+  Check
