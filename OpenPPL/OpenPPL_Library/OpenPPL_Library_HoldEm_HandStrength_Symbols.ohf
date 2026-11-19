@@ -615,10 +615,22 @@ OR [(nsuited >= 4) AND (NumberOfUnknownSuitedOvercards == 0)]
 
 ##HoldEm_MyKicker##
 WHEN isfourofakind  RETURN MadeHandFifthCardRank  FORCE
+// One hole card makes the pair / two pair / trips with the board, the other one is our kicker
+// (the 3rd/4th/5th card of the best hand can be a board card that everybody shares).
+WHEN ((isonepair OR istwopair OR isthreeofakind) AND HoldEm_KickerFromOneHoleCard) RETURN HoldEm_HoleCardKickerRank FORCE
 WHEN istwopair      RETURN MadeHandFifthCardRank  FORCE
 WHEN isthreeofakind RETURN MadeHandFourthCardRank FORCE
 WHEN isonepair      RETURN MadeHandThirdCardRank  FORCE
 WHEN Others         RETURN ERROR_You_Dont_Have_Any_Kicker FORCE
+
+##HoldEm_KickerFromOneHoleCard##
+// Exactly one hole card pairs the board (no pocket pair)
+    (RankOfFirstHoleCard != RankOfSecondHoleCard)
+AND (FirstHoleCardPairsTheBoard != SecondHoleCardPairsTheBoard)
+
+##HoldEm_HoleCardKickerRank##
+// The hole card that does not pair the board
+FirstHoleCardPairsTheBoard ? RankOfSecondHoleCard : RankOfFirstHoleCard
 
 ##HoldEm_NumberOfBetterKickers##
 // Cards better than my kicker...
@@ -1108,7 +1120,7 @@ AND NOT HaveStraight
 (TurnCard == FirstFlopCard OR TurnCard == SecondFlopCard OR TurnCard == ThirdFlopCard OR TurnCard == RiverCard)
 
 ##CommonCard4Paired##
-(RiverCard == FirstFlopCard OR RiverCard == SecondFlopCard OR RiverCard == ThirdFlopCard OR FirstFlopCard == TurnCard)
+(RiverCard == FirstFlopCard OR RiverCard == SecondFlopCard OR RiverCard == ThirdFlopCard OR RiverCard == TurnCard)
 
 ##RankBitsCommonTopBoardPair##
 // Rankbits

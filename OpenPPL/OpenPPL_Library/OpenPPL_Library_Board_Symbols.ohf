@@ -324,7 +324,7 @@ ThirdFlopCard  <= FirstFlopCard  AND ThirdFlopCard  <=  SecondFlopCard ? ThirdFl
 -1
 
 ##LowestFlopCardPairedOnTurn##
-(LowestFlopCard == TurnCard) 
+(betround >= turn) AND (LowestFlopCard == TurnCard) 
 
 ##OnlyOneStraightPossible##
 StraightPossible
@@ -385,10 +385,10 @@ NOT PairOnFlop ? SecondTopFlopCard_UnpairedFlop :
 -1
 
 ##SecondTopFlopCardPairedOnRiver##
-(SecondTopFlopCard == RiverCard)
+(betround >= river) AND (SecondTopFlopCard > 0) AND (SecondTopFlopCard == RiverCard)
 
 ##SecondTopFlopCardPairedOnTurn##
-(SecondTopFlopCard == TurnCard)
+(betround >= turn) AND (SecondTopFlopCard > 0) AND (SecondTopFlopCard == TurnCard)
 
 ##RankbitsOpponentsAndBoard_DominantSuitCommon##
 Srankbitsavailable BitOr RankbitsCommon_DominantSuitCommon
@@ -566,7 +566,7 @@ AND TurnCard > SecondFlopCard
 AND TurnCard > ThirdFlopCard ]
 
 ##TurnCardPaired##
-WHEN IsPreflop RETURN false FORCE
+WHEN (betround < river) RETURN false FORCE
 WHEN (TurnCard == RiverCard) RETURN true FORCE
 
 ##TwoOfOneSuitPresentOnFlop##

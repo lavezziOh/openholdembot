@@ -217,7 +217,7 @@ WHEN IsTurn RETURN NOutsTurn FORCE
 //cider
 (rankloplayer>rankhicommon &&  ((nopponentsplaying>1 && nsuited==3
  && nsuitedcommon==1) || (nopponentsplaying<3)) && (nstraightfillcommon>2
- || nopponentsplaying<3) && !nbetsround2>2                                  ? 3 : 0)+
+ || nopponentsplaying<3) && !(nbetsround2>2)                                ? 3 : 0)+
 
 //Overs for OESD cider
 (nstraight==4 && nstraightcommon<=3 && rankloplayer>rankhicommon &&
