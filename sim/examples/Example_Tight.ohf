@@ -1,0 +1,26 @@
+// OHSim example bot (OH-script): tight-aggressive and simple. GPL v3 or later.
+// Main functions evaluated by OpenHoldem 7+ and OHSim: f$preflop, f$flop, f$turn, f$river.
+// Return values: Fold, Check, Call, Raise, RaiseMax, RaisePot, RaiseHalfPot, ...
+//   or a positive number = bet size in big blinds.
+// handrank169: 1 = AA ... 169 = 72o.  prwin: Monte-Carlo winning chance (slower).
+
+##f$preflop##
+  (handrank169 <= 10)                         ? RaisePot :
+  (handrank169 <= 30 && call <= 1 * bblind)   ? 3 :
+  (handrank169 <= 30 && call <= 4 * bblind)   ? Call :
+  Fold
+
+##f$flop##
+  (prwin >= 0.75)                             ? RaiseHalfPot :
+  (prwin >= 0.55)                             ? Call :
+  Check
+
+##f$turn##
+  (prwin >= 0.80)                             ? RaiseHalfPot :
+  (prwin >= 0.62)                             ? Call :
+  Check
+
+##f$river##
+  (prwin >= 0.85)                             ? RaisePot :
+  (prwin >= 0.70)                             ? Call :
+  Check

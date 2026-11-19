@@ -1,0 +1,34 @@
+# python -m ohsim.run examples/example_6max.toml 20000 -j 4
+[table]
+hands = 20000
+sb = 0.5
+bb = 1.0
+buyin = 100
+rake = 0.05        # 5% ...
+rake_cap = 5.0     # ... capped at 5 big blinds, no flop no drop
+max_stack = 100    # = buyin: every stack reset to 100bb before each hand
+seed = 1
+
+[[player]]
+name = "Tight_1"
+profile = 'examples/Example_Tight.ohf'
+
+[[player]]
+name = "Tight_2"
+profile = 'examples/Example_Tight.ohf'
+
+[[player]]
+name = "Loose_1"
+profile = 'examples/Example_Loose.ohf'
+
+[[player]]
+name = "Loose_2"
+profile = 'examples/Example_Loose.ohf'
+
+[[player]]
+name = "Loose_3"
+profile = 'examples/Example_Loose.ohf'
+
+[[player]]
+name = "Loose_4"
+profile = 'examples/Example_Loose.ohf'

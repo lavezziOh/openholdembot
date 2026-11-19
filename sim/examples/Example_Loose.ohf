@@ -1,0 +1,21 @@
+// OHSim example bot (OH-script): loose-passive, calls a lot. GPL v3 or later.
+
+##f$preflop##
+  (handrank169 <= 8)                          ? RaisePot :
+  (handrank169 <= 90 && call <= 4 * bblind)   ? Call :
+  Fold
+
+##f$flop##
+  (prwin >= 0.85)                             ? RaiseHalfPot :
+  (prwin >= 0.35)                             ? Call :
+  Check
+
+##f$turn##
+  (prwin >= 0.85)                             ? RaiseHalfPot :
+  (prwin >= 0.40)                             ? Call :
+  Check
+
+##f$river##
+  (prwin >= 0.90)                             ? RaisePot :
+  (prwin >= 0.45)                             ? Call :
+  Check
