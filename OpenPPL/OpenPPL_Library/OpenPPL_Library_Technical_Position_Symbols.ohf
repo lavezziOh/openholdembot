@@ -129,8 +129,8 @@ HINT_There_Are_No_true_Raisers
 
 ##SmallBlindRaising##
     [(raisbits_preflop >> smallblindchair) & 1 == 1]
-AND [SmallBlindCurrentBet >= 1.01]
+AND [(betround > preflop) OR (SmallBlindCurrentBet >= 1.01)]
 
 ##BigBlindRaising##
     [(raisbits_preflop >> bigblindchair) & 1 == 1]
-AND [BigBlindCurrentBet >= 1.01]
+AND [(betround > preflop) OR (BigBlindCurrentBet >= 1.01)]

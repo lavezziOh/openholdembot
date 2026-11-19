@@ -207,11 +207,97 @@ WHEN Others RETURN
 
 ##CallsBeforeOurFirstAction##
 WHEN (BotsActionsOnThisRoundIncludingChecks > 0) RETURN 0 FORCE
+// Preflop with a raise: the limpers (and a completing small blind) called too
+WHEN (IsPreflop AND (currentbet_lastraiserchair > bblind)) RETURN (nopponentscalling + LimpersBeforeTheRaise + CallersOfEarlierRaises) FORCE
+WHEN (currentbet_lastraiserchair > 0) RETURN (nopponentscalling + CallersOfEarlierRaises) FORCE
 WHEN Others RETURN nopponentscalling FORCE
+
+##CallsLevelFloor##
+// Bets above this level are bets or raises (preflop: the big blind)
+WHEN IsPreflop RETURN bblind FORCE
+WHEN Others RETURN 0 FORCE
+
+##CallersOfEarlierRaises##
+// Callers of a bet or raise that got re-raised before our first action
+// (at every bet level below the highest one: players at that level minus the raiser).
+  PlayersAtEarlierRaiseLevels - EarlierRaiseLevels
+
+##PlayersAtEarlierRaiseLevels##
+  (((currentbet0 > CallsLevelFloor) AND (currentbet0 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet1 > CallsLevelFloor) AND (currentbet1 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet2 > CallsLevelFloor) AND (currentbet2 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet3 > CallsLevelFloor) AND (currentbet3 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet4 > CallsLevelFloor) AND (currentbet4 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet5 > CallsLevelFloor) AND (currentbet5 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet6 > CallsLevelFloor) AND (currentbet6 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet7 > CallsLevelFloor) AND (currentbet7 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet8 > CallsLevelFloor) AND (currentbet8 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet9 > CallsLevelFloor) AND (currentbet9 < currentbet_lastraiserchair)) ? 1 : 0)
+
+##EarlierRaiseLevels##
+  (((currentbet0 > CallsLevelFloor) AND (currentbet0 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet1 > CallsLevelFloor) AND (currentbet1 < currentbet_lastraiserchair) AND (currentbet0 != currentbet1)) ? 1 : 0)
++ (((currentbet2 > CallsLevelFloor) AND (currentbet2 < currentbet_lastraiserchair) AND (currentbet0 != currentbet2) AND (currentbet1 != currentbet2)) ? 1 : 0)
++ (((currentbet3 > CallsLevelFloor) AND (currentbet3 < currentbet_lastraiserchair) AND (currentbet0 != currentbet3) AND (currentbet1 != currentbet3) AND (currentbet2 != currentbet3)) ? 1 : 0)
++ (((currentbet4 > CallsLevelFloor) AND (currentbet4 < currentbet_lastraiserchair) AND (currentbet0 != currentbet4) AND (currentbet1 != currentbet4) AND (currentbet2 != currentbet4) AND (currentbet3 != currentbet4)) ? 1 : 0)
++ (((currentbet5 > CallsLevelFloor) AND (currentbet5 < currentbet_lastraiserchair) AND (currentbet0 != currentbet5) AND (currentbet1 != currentbet5) AND (currentbet2 != currentbet5) AND (currentbet3 != currentbet5) AND (currentbet4 != currentbet5)) ? 1 : 0)
++ (((currentbet6 > CallsLevelFloor) AND (currentbet6 < currentbet_lastraiserchair) AND (currentbet0 != currentbet6) AND (currentbet1 != currentbet6) AND (currentbet2 != currentbet6) AND (currentbet3 != currentbet6) AND (currentbet4 != currentbet6) AND (currentbet5 != currentbet6)) ? 1 : 0)
++ (((currentbet7 > CallsLevelFloor) AND (currentbet7 < currentbet_lastraiserchair) AND (currentbet0 != currentbet7) AND (currentbet1 != currentbet7) AND (currentbet2 != currentbet7) AND (currentbet3 != currentbet7) AND (currentbet4 != currentbet7) AND (currentbet5 != currentbet7) AND (currentbet6 != currentbet7)) ? 1 : 0)
++ (((currentbet8 > CallsLevelFloor) AND (currentbet8 < currentbet_lastraiserchair) AND (currentbet0 != currentbet8) AND (currentbet1 != currentbet8) AND (currentbet2 != currentbet8) AND (currentbet3 != currentbet8) AND (currentbet4 != currentbet8) AND (currentbet5 != currentbet8) AND (currentbet6 != currentbet8) AND (currentbet7 != currentbet8)) ? 1 : 0)
++ (((currentbet9 > CallsLevelFloor) AND (currentbet9 < currentbet_lastraiserchair) AND (currentbet0 != currentbet9) AND (currentbet1 != currentbet9) AND (currentbet2 != currentbet9) AND (currentbet3 != currentbet9) AND (currentbet4 != currentbet9) AND (currentbet5 != currentbet9) AND (currentbet6 != currentbet9) AND (currentbet7 != currentbet9) AND (currentbet8 != currentbet9)) ? 1 : 0)
+
+##LimpersBeforeTheRaise##
+// Opponents (not the big blind) whose bet is exactly one big blind while there is a raise:
+// they limped (or completed the small blind) before the raise and did not act on it yet.
+  ((userchair != 0) AND (bigblindchair != 0) AND (currentbet0 == bblind) ? 1 : 0)
++ ((userchair != 1) AND (bigblindchair != 1) AND (currentbet1 == bblind) ? 1 : 0)
++ ((userchair != 2) AND (bigblindchair != 2) AND (currentbet2 == bblind) ? 1 : 0)
++ ((userchair != 3) AND (bigblindchair != 3) AND (currentbet3 == bblind) ? 1 : 0)
++ ((userchair != 4) AND (bigblindchair != 4) AND (currentbet4 == bblind) ? 1 : 0)
++ ((userchair != 5) AND (bigblindchair != 5) AND (currentbet5 == bblind) ? 1 : 0)
++ ((userchair != 6) AND (bigblindchair != 6) AND (currentbet6 == bblind) ? 1 : 0)
++ ((userchair != 7) AND (bigblindchair != 7) AND (currentbet7 == bblind) ? 1 : 0)
++ ((userchair != 8) AND (bigblindchair != 8) AND (currentbet8 == bblind) ? 1 : 0)
++ ((userchair != 9) AND (bigblindchair != 9) AND (currentbet9 == bblind) ? 1 : 0)
 
 ##CallsSinceLastPlay##
 WHEN (BotsActionsOnThisRoundIncludingChecks == 0) RETURN 0 FORCE
+// Re-raised after our action: count also the calls made before the re-raise
+WHEN (currentbet_lastraiserchair > currentbet) RETURN (nopponentscalling + CallersOfOurRaiseBeforeTheReraise + CallersOfRaisesAfterOurAction) FORCE
 WHEN Others RETURN nopponentscalling FORCE
+
+##CallersOfOurRaiseBeforeTheReraise##
+// Opponents who matched our bet or raise (prevaction 2 = raise, 3 = betsize) and did not act again yet
+WHEN ((prevaction == 2) OR (prevaction == 3)) RETURN SqueezeColdCallersOfOurBet FORCE
+WHEN Others RETURN 0 FORCE
+
+##CallersOfRaisesAfterOurAction##
+// Bet levels between ours and the highest one: players at that level minus the raiser
+  PlayersBetweenOurBetAndTheRaise - LevelsBetweenOurBetAndTheRaise
+
+##PlayersBetweenOurBetAndTheRaise##
+  (((currentbet0 > currentbet) AND (currentbet0 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet1 > currentbet) AND (currentbet1 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet2 > currentbet) AND (currentbet2 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet3 > currentbet) AND (currentbet3 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet4 > currentbet) AND (currentbet4 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet5 > currentbet) AND (currentbet5 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet6 > currentbet) AND (currentbet6 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet7 > currentbet) AND (currentbet7 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet8 > currentbet) AND (currentbet8 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet9 > currentbet) AND (currentbet9 < currentbet_lastraiserchair)) ? 1 : 0)
+
+##LevelsBetweenOurBetAndTheRaise##
+  (((currentbet0 > currentbet) AND (currentbet0 < currentbet_lastraiserchair)) ? 1 : 0)
++ (((currentbet1 > currentbet) AND (currentbet1 < currentbet_lastraiserchair) AND (currentbet0 != currentbet1)) ? 1 : 0)
++ (((currentbet2 > currentbet) AND (currentbet2 < currentbet_lastraiserchair) AND (currentbet0 != currentbet2) AND (currentbet1 != currentbet2)) ? 1 : 0)
++ (((currentbet3 > currentbet) AND (currentbet3 < currentbet_lastraiserchair) AND (currentbet0 != currentbet3) AND (currentbet1 != currentbet3) AND (currentbet2 != currentbet3)) ? 1 : 0)
++ (((currentbet4 > currentbet) AND (currentbet4 < currentbet_lastraiserchair) AND (currentbet0 != currentbet4) AND (currentbet1 != currentbet4) AND (currentbet2 != currentbet4) AND (currentbet3 != currentbet4)) ? 1 : 0)
++ (((currentbet5 > currentbet) AND (currentbet5 < currentbet_lastraiserchair) AND (currentbet0 != currentbet5) AND (currentbet1 != currentbet5) AND (currentbet2 != currentbet5) AND (currentbet3 != currentbet5) AND (currentbet4 != currentbet5)) ? 1 : 0)
++ (((currentbet6 > currentbet) AND (currentbet6 < currentbet_lastraiserchair) AND (currentbet0 != currentbet6) AND (currentbet1 != currentbet6) AND (currentbet2 != currentbet6) AND (currentbet3 != currentbet6) AND (currentbet4 != currentbet6) AND (currentbet5 != currentbet6)) ? 1 : 0)
++ (((currentbet7 > currentbet) AND (currentbet7 < currentbet_lastraiserchair) AND (currentbet0 != currentbet7) AND (currentbet1 != currentbet7) AND (currentbet2 != currentbet7) AND (currentbet3 != currentbet7) AND (currentbet4 != currentbet7) AND (currentbet5 != currentbet7) AND (currentbet6 != currentbet7)) ? 1 : 0)
++ (((currentbet8 > currentbet) AND (currentbet8 < currentbet_lastraiserchair) AND (currentbet0 != currentbet8) AND (currentbet1 != currentbet8) AND (currentbet2 != currentbet8) AND (currentbet3 != currentbet8) AND (currentbet4 != currentbet8) AND (currentbet5 != currentbet8) AND (currentbet6 != currentbet8) AND (currentbet7 != currentbet8)) ? 1 : 0)
++ (((currentbet9 > currentbet) AND (currentbet9 < currentbet_lastraiserchair) AND (currentbet0 != currentbet9) AND (currentbet1 != currentbet9) AND (currentbet2 != currentbet9) AND (currentbet3 != currentbet9) AND (currentbet4 != currentbet9) AND (currentbet5 != currentbet9) AND (currentbet6 != currentbet9) AND (currentbet7 != currentbet9) AND (currentbet8 != currentbet9)) ? 1 : 0)
 
 ##CallsSinceLastRaise##
 WHEN (PlayersRaisingOrColdCallingTheLastRaise <= 0) RETURN HINT_There_Is_No_Raiser_Therefore_No_CallsSinceLastRaise FORCE
@@ -259,3 +345,102 @@ WHEN (BotsActionsOnThisRoundIncludingChecks == 0) RETURN RaisesBeforeOurFirstAct
 WHEN (BotsActionsOnThisRoundIncludingChecks == 1) RETURN RaisesSinceLastPlayOnOurSecondAction FORCE
 WHEN (BotsActionsOnThisRoundIncludingChecks >= 2) RETURN RaisesSinceLastPlayAfterOurSecondAction FORCE
 WHEN Others RETURN ERROR_BotsActionsOnThisRound_Out_Of_Range FORCE
+
+//*****************************************************************************
+//
+// Squeeze
+//   squeeze = a 3-bet after an open raise and at least one cold call
+//
+//*****************************************************************************
+
+##SqueezeOpportunity##
+// Our first action preflop: exactly one raise and at least one call of it.
+WHEN (NOT IsPreflop) RETURN false FORCE
+WHEN (BotsActionsOnThisRoundIncludingChecks > 0) RETURN false FORCE
+WHEN (RaisesBeforeOurFirstAction == 1) AND (CallsSinceLastRaise >= 1) RETURN true FORCE
+WHEN Others RETURN false FORCE
+
+##SqueezeSize##
+// Raise-to amount (big blinds) of a squeeze: 3 times the open raise, plus 1 time per caller,
+// plus 1 time out of position (from the blinds). 0 if there is no squeeze opportunity.
+WHEN (NOT SqueezeOpportunity) RETURN 0 FORCE
+WHEN Others RETURN ((currentbet_lastraiserchair / bblind) * (3 + CallsSinceLastRaise + (InTheBlinds ? 1 : 0))) FORCE
+
+##SqueezeFoldChanceOpener##
+// PokerTracker "fold to squeeze as raiser" of the open raiser; population value without data.
+WHEN (pt_fold_to_squeeze_as_raiser_lastraiserchair >= 0) RETURN pt_fold_to_squeeze_as_raiser_lastraiserchair FORCE
+WHEN Others RETURN 0.60 FORCE
+
+##SqueezeFoldChanceFirstCaller##
+WHEN (pt_fold_to_squeeze_as_caller_firstcallerchair >= 0) RETURN pt_fold_to_squeeze_as_caller_firstcallerchair FORCE
+WHEN Others RETURN 0.70 FORCE
+
+##SqueezeFoldChanceLastCaller##
+WHEN (pt_fold_to_squeeze_as_caller_lastcallerchair >= 0) RETURN pt_fold_to_squeeze_as_caller_lastcallerchair FORCE
+WHEN Others RETURN 0.70 FORCE
+
+##SqueezeFoldChance##
+// Probability that everybody folds to our squeeze: the open raiser, the callers
+// (first and last caller with their own statistics, the others 0.70 each)
+// and the players still to act behind us (0.90 each). 0 if there is no squeeze opportunity.
+WHEN (NOT SqueezeOpportunity) RETURN 0 FORCE
+WHEN Others RETURN (SqueezeFoldChanceOpener
+  * SqueezeFoldChanceFirstCaller
+  * ((CallsSinceLastRaise >= 2) ? SqueezeFoldChanceLastCaller : 1)
+  * ((CallsSinceLastRaise >= 3) ? 0.70 : 1)
+  * ((CallsSinceLastRaise >= 4) ? 0.70 : 1)
+  * ((CallsSinceLastRaise >= 5) ? 0.70 : 1)
+  * ((StillToAct >= 1) ? 0.90 : 1)
+  * ((StillToAct >= 2) ? 0.90 : 1)
+  * ((StillToAct >= 3) ? 0.90 : 1)
+  * ((StillToAct >= 4) ? 0.90 : 1)
+  * ((StillToAct >= 5) ? 0.90 : 1)) FORCE
+
+##SqueezeColdCallersOfOurBet##
+// Opponents whose bet equals ours (they called our bet and did not act again yet).
+  ((userchair != 0) AND (currentbet0 == currentbet) AND (currentbet > 0) ? 1 : 0)
++ ((userchair != 1) AND (currentbet1 == currentbet) AND (currentbet > 0) ? 1 : 0)
++ ((userchair != 2) AND (currentbet2 == currentbet) AND (currentbet > 0) ? 1 : 0)
++ ((userchair != 3) AND (currentbet3 == currentbet) AND (currentbet > 0) ? 1 : 0)
++ ((userchair != 4) AND (currentbet4 == currentbet) AND (currentbet > 0) ? 1 : 0)
++ ((userchair != 5) AND (currentbet5 == currentbet) AND (currentbet > 0) ? 1 : 0)
++ ((userchair != 6) AND (currentbet6 == currentbet) AND (currentbet > 0) ? 1 : 0)
++ ((userchair != 7) AND (currentbet7 == currentbet) AND (currentbet > 0) ? 1 : 0)
++ ((userchair != 8) AND (currentbet8 == currentbet) AND (currentbet > 0) ? 1 : 0)
++ ((userchair != 9) AND (currentbet9 == currentbet) AND (currentbet > 0) ? 1 : 0)
+
+##SqueezeBetsBetweenBigBlindAndOurs##
+// Opponents with a bet above the big blind but below ours (a raise we re-raised or called).
+  ((userchair != 0) AND (currentbet0 > bblind) AND (currentbet0 < currentbet) ? 1 : 0)
++ ((userchair != 1) AND (currentbet1 > bblind) AND (currentbet1 < currentbet) ? 1 : 0)
++ ((userchair != 2) AND (currentbet2 > bblind) AND (currentbet2 < currentbet) ? 1 : 0)
++ ((userchair != 3) AND (currentbet3 > bblind) AND (currentbet3 < currentbet) ? 1 : 0)
++ ((userchair != 4) AND (currentbet4 > bblind) AND (currentbet4 < currentbet) ? 1 : 0)
++ ((userchair != 5) AND (currentbet5 > bblind) AND (currentbet5 < currentbet) ? 1 : 0)
++ ((userchair != 6) AND (currentbet6 > bblind) AND (currentbet6 < currentbet) ? 1 : 0)
++ ((userchair != 7) AND (currentbet7 > bblind) AND (currentbet7 < currentbet) ? 1 : 0)
++ ((userchair != 8) AND (currentbet8 > bblind) AND (currentbet8 < currentbet) ? 1 : 0)
++ ((userchair != 9) AND (currentbet9 > bblind) AND (currentbet9 < currentbet) ? 1 : 0)
+
+##FacingSqueezeAsRaiser##
+// We open-raised, at least one player cold-called, then somebody 3-bet.
+WHEN (NOT IsPreflop) RETURN false FORCE
+WHEN (BotsActionsOnThisRoundIncludingChecks != 1) RETURN false FORCE
+WHEN (NOT BotRaisedBeforeFlop) RETURN false FORCE
+WHEN (RaisesSinceLastPlay != 1) RETURN false FORCE
+WHEN (SqueezeBetsBetweenBigBlindAndOurs > 0) RETURN false FORCE
+WHEN (SqueezeColdCallersOfOurBet >= 1) RETURN true FORCE
+WHEN Others RETURN false FORCE
+
+##FacingSqueezeAsCaller##
+// We cold-called an open raise, then somebody 3-bet.
+WHEN (NOT IsPreflop) RETURN false FORCE
+WHEN (BotsActionsOnThisRoundIncludingChecks != 1) RETURN false FORCE
+WHEN (NOT BotCalledBeforeFlop) RETURN false FORCE
+WHEN (currentbet <= bblind) RETURN false FORCE
+WHEN (RaisesSinceLastPlay != 1) RETURN false FORCE
+WHEN (SqueezeBetsBetweenBigBlindAndOurs > 0) RETURN false FORCE
+WHEN Others RETURN true FORCE
+
+##FacingSqueeze##
+(FacingSqueezeAsRaiser OR FacingSqueezeAsCaller)

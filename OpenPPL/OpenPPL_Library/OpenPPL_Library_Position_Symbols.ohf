@@ -187,18 +187,18 @@ UTG
 Middle
 
 ##FirstCallerPosition##
-// We have to search starting from early positions,
-// as we want to detect the first one.
-EarlyPosition1Calling  ? 9 :
-EarlyPosition2Calling  ? 8 :
-EarlyPosition3Calling  ? 7 :
-MiddlePosition1Calling ? 6 :
-MiddlePosition2Calling ? 5 :
-MiddlePosition3Calling ? 4 :
-CutOffCalling          ? 3 :
-ButtonCalling          ? 2 :
-SmallBlindCalling      ? 1 :
-// Can't be big blind (0), as it is for the first orbit preflop only
+// Searching from the early positions: the first caller of the first orbit preflop
+// (callers that did not raise preflop; the open raiser calling a 3-bet is no "first caller").
+EarlyPosition1ColdCalling ? 9 :
+EarlyPosition2ColdCalling ? 8 :
+EarlyPosition3ColdCalling ? 7 :
+MiddlePosition1ColdCalling ? 6 :
+MiddlePosition2ColdCalling ? 5 :
+MiddlePosition3ColdCalling ? 4 :
+CutOffColdCalling ? 3 :
+ButtonColdCalling ? 2 :
+SmallBlindColdCalling ? 1 :
+BigBlindColdCalling ? 0 :
 HINT_No_FirstCaller
 
 ##FirstRaiserPosition##
@@ -213,29 +213,71 @@ MiddlePosition3Raising ? 4 :
 CutOffRaising          ? 3 :
 ButtonRaising          ? 2 :
 SmallBlindRaising ? 1 :
-// Can't be big blind (0), as it is for the first orbit preflop only
+// The big blind raises first in a limped pot (it was missing: no raiser found)
+BigBlindRaising   ? 0 :
 HINT_No_FirstRaiser
 
 ##LastCallerPosition##
-// Can't be big blind (0), as it is for the first orbit preflop only
-SmallBlindCalling      ? 1 :
-ButtonCalling          ? 2 :
-CutOffCalling          ? 3 :
-MiddlePosition3Calling ? 4 :
-MiddlePosition2Calling ? 5 :
-MiddlePosition1Calling ? 6 :
-EarlyPosition3Calling  ? 7 :
-EarlyPosition2Calling  ? 8 :
-EarlyPosition1Calling  ? 9 :
+// Searching from the late positions (the big blind acts last): the last caller of the first orbit
+BigBlindColdCalling ? 0 :
+SmallBlindColdCalling ? 1 :
+ButtonColdCalling ? 2 :
+CutOffColdCalling ? 3 :
+MiddlePosition3ColdCalling ? 4 :
+MiddlePosition2ColdCalling ? 5 :
+MiddlePosition1ColdCalling ? 6 :
+EarlyPosition3ColdCalling ? 7 :
+EarlyPosition2ColdCalling ? 8 :
+EarlyPosition1ColdCalling ? 9 :
 HINT_No_LastCaller
 
 ##LastRaiserPosition##
 // Handling the case of blind-raisers only first
 [IsPreflop AND (ncallbets <= 1)] ? HINT_There_Are_No_true_Raisers :
 // Big blind = 0
-BigBlindRaising ? 0 :
+(AggressorChair == bigblindchair) ? 0 :
 // Small blind = 1
-SmallBlindRaising ? 1 :
+(AggressorChair == smallblindchair) ? 1 :
 // Normal players:
 // Button = 2, CutOff = 3, ...
 (nplayersdealt - DealPositionLastRaiser + 2)
+
+##EarlyPosition1ColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> ep1chair) & 1) == 1) AND (((raisbits_preflop >> ep1chair) & 1) == 0)
+
+##EarlyPosition2ColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> ep2chair) & 1) == 1) AND (((raisbits_preflop >> ep2chair) & 1) == 0)
+
+##EarlyPosition3ColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> ep3chair) & 1) == 1) AND (((raisbits_preflop >> ep3chair) & 1) == 0)
+
+##MiddlePosition1ColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> mp1chair) & 1) == 1) AND (((raisbits_preflop >> mp1chair) & 1) == 0)
+
+##MiddlePosition2ColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> mp2chair) & 1) == 1) AND (((raisbits_preflop >> mp2chair) & 1) == 0)
+
+##MiddlePosition3ColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> mp3chair) & 1) == 1) AND (((raisbits_preflop >> mp3chair) & 1) == 0)
+
+##CutOffColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> cutoffchair) & 1) == 1) AND (((raisbits_preflop >> cutoffchair) & 1) == 0)
+
+##ButtonColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> buttonchair) & 1) == 1) AND (((raisbits_preflop >> buttonchair) & 1) == 0)
+
+##SmallBlindColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> smallblindchair) & 1) == 1) AND (((raisbits_preflop >> smallblindchair) & 1) == 0)
+
+##BigBlindColdCalling##
+// Called preflop and did not raise preflop (a caller of the first orbit)
+(((callbits_preflop >> bigblindchair) & 1) == 1) AND (((raisbits_preflop >> bigblindchair) & 1) == 0)
