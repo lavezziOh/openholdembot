@@ -96,6 +96,7 @@ class Runtime:
         self.trace = None            # list to record (function, value) if set
         self._hk = None              # hand key (e.g. "AKs") cached per decision
         self.codegen = True          # compile functions to Python source (fast path)
+        self.last_rule_idx = -1      # index of last WHEN clause that matched (-1 = none)
 
     # ------------------------------------------------------------------ load
     def load_file(self, path, library=False, optional=False):
@@ -172,6 +173,7 @@ class Runtime:
         """Clear the per-heartbeat function cache (OpenHoldem: ClearCache)."""
         self.cache.clear()
         self._hk = None
+        self.last_rule_idx = -1
 
     def hand_reset(self):
         self.user_vars.clear()
@@ -507,29 +509,34 @@ class Runtime:
 
     def _c_when(self, groups, default_name):
         compiled = []
+        idx = 0
         for guard, clauses in groups:
             g = self._c(guard) if guard is not None else None
             cl = []
             for cond, action in clauses:
                 fn, is_set = self._c_action(action)
-                cl.append((self._c(cond), fn, is_set))
+                cl.append((self._c(cond), fn, is_set, idx))
+                idx += 1
             compiled.append((g, cl))
         if default_name and default_name in self.objects:
             evaluate = self.evaluate
             end = lambda: evaluate(default_name)
         else:
             end = lambda: 0.0
+        rt = self
 
         def run():
             for g, cl in compiled:
                 if g is not None and not g():
                     continue
-                for cond, fn, is_set in cl:
+                for cond, fn, is_set, ridx in cl:
                     if cond():
                         if is_set:
                             fn()
                             continue
+                        rt.last_rule_idx = ridx
                         return fn()
+            rt.last_rule_idx = -1
             return end()
         return run
 
@@ -651,9 +658,11 @@ class _CodeGen:
             out.append(self.expr(n))
 
     def function(self, tree, name):
+        rt_name = self.bind(self.rt, "rt")
         lines = ["def _f():"]
         if tree[0] == "when":
             groups, default_name = tree[1], tree[2]
+            idx = 0
             for guard, clauses in groups:
                 ind = "    "
                 if guard is not None:
@@ -665,11 +674,18 @@ class _CodeGen:
                     fn, is_set = self.rt._c_action(action)
                     a = self.bind(fn, "a")
                     lines.append(f"{ind}if {self.expr(cond)}:")
-                    lines.append(f"{ind}    {a}()" if is_set else f"{ind}    return {a}()")
+                    if is_set:
+                        lines.append(f"{ind}    {a}()")
+                    else:
+                        lines.append(f"{ind}    {rt_name}.last_rule_idx={idx}")
+                        lines.append(f"{ind}    return {a}()")
+                    idx += 1
             if default_name and default_name in self.rt.objects:
                 ev = self.bind(self.rt.evaluate, "e")
+                lines.append(f"    {rt_name}.last_rule_idx=-1")
                 lines.append(f"    return {ev}({default_name!r})")
             else:
+                lines.append(f"    {rt_name}.last_rule_idx=-1")
                 lines.append("    return 0.0")
         else:
             lines.append(f"    return {self.expr(tree)}")

@@ -62,7 +62,7 @@ class SymbolProvider:
         self.hands_played = 0
         self.stats = stats              # shared PlayerStats (for pt_ symbols), optional
         self.prwin_opponents_fn = None  # callable returning f$prwin_number_of_opponents
-        self.range_model = None
+        self.range_model = None         # ohsim.ranges.PlayerModel shared by the table (dll$prwin_range)
         self._prwin_cache = {}
         self.random_hand = self.rng.random()
         self.random_round = self.rng.random()
@@ -584,8 +584,48 @@ class SymbolProvider:
         raise KeyError(name)
 
     def _dll(self, name):
-        """Symbols that OpenHoldem gets from a user DLL: not provided by the simulator
-        (reported as missing at the end of the run, value 0 like in OpenHoldem without the DLL)."""
+        """Symbols that OpenHoldem would get from a user DLL (here computed by the simulator).
+        dll$prwin_range: win probability against the ranges of the live opponents (ohsim.ranges);
+        dll$range_opponents: number of live opponents used."""
+        from . import ranges
+        me = self.view.me
+        t = self.t
+        if name == "dll$range_opponents":
+            return float(len([s for s in t.seats if s.in_hand and not s.folded and s is not me]))
+        if name == "dll$prwin_range":
+            model = self.range_model or ranges.PlayerModel()
+            W = ranges.opponent_ranges(t, me.chair, model, me.hole)
+            if not W:
+                return 1.0
+            return ranges.equity(me.hole, list(t.board), list(W.values()), iters=400, rng=self.rng)
+        if name == "dll$range_eq_raise":
+            key = (t.hand_no, len(t.history), me.chair)
+            if getattr(self, "_raise_key", None) != key:
+                model = self.range_model or ranges.PlayerModel()
+                self._raise_eq = ranges.raise_equity(t, me.chair, model, me.hole, rng=self.rng)
+                self._raise_key = key
+            return self._raise_eq
+        if name == "dll$prwin_oh":
+            # OpenHoldem's own weighted prwin, at its best: willplay = mean VPIP of the live opponents (HUD),
+            # wontplay = VPIP + 10 points, the same range for every opponent, no change after preflop
+            model = self.range_model or ranges.PlayerModel()
+            live = [s for s in t.seats if s.in_hand and not s.folded and s is not me]
+            if not live:
+                return 1.0
+            v = sum(model.vpip(s.name) for s in live) / len(live)
+            w = ranges.oh_weights(ranges.oh_classes(v), ranges.oh_classes(min(1.0, v + 0.10)), len(live),
+                                  dead=list(me.hole) + list(t.board))
+            return ranges.equity(me.hole, list(t.board), [w] * len(live), iters=400, rng=self.rng)
+        if name in ("dll$range_fold", "dll$range_eq_call", "dll$range_eq_now", "dll$range_bet_gain"):
+            # bet outlook, cached per decision (same hand, same history length)
+            key = (t.hand_no, len(t.history), me.chair)
+            if getattr(self, "_outlook_key", None) != key:
+                model = self.range_model or ranges.PlayerModel()
+                self._outlook = ranges.bet_outlook(t, me.chair, model, me.hole, rng=self.rng)
+                self._outlook_key = key
+            fold, eq_call, eq_now, gain = self._outlook
+            return {"dll$range_fold": fold, "dll$range_eq_call": eq_call, "dll$range_eq_now": eq_now,
+                    "dll$range_bet_gain": gain}[name]
         self.missing[name] += 1
         return 0.0
 
