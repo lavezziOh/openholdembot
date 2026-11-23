@@ -1045,11 +1045,8 @@ bool CScraper::IsIdenticalScrape() {
 	// If the bitmaps are the same, then return now
 	// !! How often does this happen?
 	// !! How costly is the comparison?
-	if (BitmapsAreEqual(_entire_window_last, _entire_window_cur) 
+	if (BitmapsAreEqual(_entire_window_last, _entire_window_cur)
       && !p_table_state->TableTitle()->TitleChangedSinceLastHeartbeat()) 	{
-		DeleteDC(hdcCompatible);
-		DeleteDC(hdcScreen);
-		ReleaseDC(p_autoconnector->attached_hwnd(), hdc);
 		write_log(Preferences()->debug_scraper(), "[CScraper] IsIdenticalScrape() true\n");
     __HDC_FOOTER_ATTENTION_HAS_TO_BE_CALLED_ON_EVERY_FUNCTION_EXIT_OTHERWISE_MEMORY_LEAK
 		return true;
