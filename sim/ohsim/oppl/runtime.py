@@ -9,10 +9,17 @@ The runtime does not know anything about poker by itself: game symbols
 """
 import math
 import os
+import threading
 from collections import Counter
+
+_tls = threading.local()
 
 from .parser import (split_file, FunctionParser, parse_list, walk_identifiers,
                      MAIN_FUNCTIONS)
+from .shanky import TABLE as _SHANKY_TABLE
+
+# Reverse map: OpenPPL CamelCase -> OpenHoldem lowercase
+_OPENPPL_TO_OH = {v: k for k, v in _SHANKY_TABLE.items()}
 
 EPS = 1e-6
 K_UNDEFINED = -1.0
@@ -81,6 +88,13 @@ def _bitcount(x):
     return bin(_u32(x)).count("1")
 
 
+def _tls_hand_key():
+    k = getattr(_tls, '_hk', None)
+    if k is None:
+        k = _tls._hk = _tls.hand_key_fn()
+    return k
+
+
 class Runtime:
     def __init__(self, provider=None, log=None):
         self.provider = provider
@@ -96,6 +110,7 @@ class Runtime:
         self.trace = None            # list to record (function, value) if set
         self._hk = None              # hand key (e.g. "AKs") cached per decision
         self.codegen = True          # compile functions to Python source (fast path)
+        self.last_rule_idx = -1      # index of last WHEN clause that matched (-1 = none)
 
     # ------------------------------------------------------------------ load
     def load_file(self, path, library=False, optional=False):
@@ -172,6 +187,12 @@ class Runtime:
         """Clear the per-heartbeat function cache (OpenHoldem: ClearCache)."""
         self.cache.clear()
         self._hk = None
+        self.last_rule_idx = -1
+        _tls.symbol = self.provider.symbol
+        _tls.ident = self.identifier
+        _tls.errors = self.runtime_errors
+        _tls.hand_key_fn = self._hand_key
+        _tls._hk = None
 
     def hand_reset(self):
         self.user_vars.clear()
@@ -179,6 +200,12 @@ class Runtime:
         self._hk = None
 
     def evaluate(self, name):
+        if not hasattr(_tls, 'symbol') and self.provider is not None:
+            _tls.symbol = self.provider.symbol
+            _tls.ident = self.identifier
+            _tls.errors = self.runtime_errors
+            _tls.hand_key_fn = self._hand_key
+            _tls._hk = None
         v = self.cache.get(name)
         if v is not None:
             return v
@@ -235,6 +262,16 @@ class Runtime:
             return self.identifier(f"{pure}{int(v)}")
         try:
             return float(self.provider.symbol(name))
+        except KeyError:
+            pass
+        oh = _OPENPPL_TO_OH.get(name)
+        if oh:
+            try:
+                return float(self.provider.symbol(oh))
+            except KeyError:
+                pass
+        try:
+            return float(self.provider.symbol(name.lower()))
         except KeyError:
             self.runtime_errors[f"unknown symbol {name}"] += 1
             return 0.0
@@ -351,41 +388,40 @@ class Runtime:
 
     def _c_ident(self, name):
         """Resolve the kind of identifier once, at compile time (same order as identifier())."""
-        ident = self.identifier
         o = self.objects.get(name)
         if o is not None:
             if o.is_list:
                 hands = o.hands
-                hand_key = self._hand_key_cached
-                return lambda: 1.0 if hand_key() in hands else 0.0
-            cache = self.cache
-            evaluate = self.evaluate
-
-            def fn():
-                v = cache.get(name)
-                return v if v is not None else evaluate(name)
-            return fn
+                return lambda: 1.0 if _tls_hand_key() in hands else 0.0
+            return lambda: _tls.ident(name)
         if name[:3] == "me_":
-            parts = name.split("_", 3)
-            if len(parts) >= 3 and parts[1] == "re" and parts[2]:
-                memory, key = self.memory, parts[2].lower()
-                return lambda: memory.get(key, 0.0)
-            return lambda: ident(name)
+            return lambda: _tls.ident(name)
         if name[:4].lower() == "user" and name[4:9] != "chair":
-            user_vars = self.user_vars
-            return lambda: 1.0 if name in user_vars else 0.0
+            return lambda: _tls.ident(name)
         if name.startswith(("hand$", "board$", "msgbox$", "log$")) \
                 or self._multiplex_pure(name) is not None or self.provider is None:
-            return lambda: ident(name)
-        symbol = self.provider.symbol
-        errors = self.runtime_errors
+            return lambda: _tls.ident(name)
+        oh_name = _OPENPPL_TO_OH.get(name)
+        lower_name = name.lower()
 
         def sym():
+            symbol = _tls.symbol
             try:
                 return float(symbol(name))
             except KeyError:
-                errors[f"unknown symbol {name}"] += 1
-                return 0.0
+                pass
+            if oh_name:
+                try:
+                    return float(symbol(oh_name))
+                except KeyError:
+                    pass
+            if lower_name != name:
+                try:
+                    return float(symbol(lower_name))
+                except KeyError:
+                    pass
+            _tls.errors[f"unknown symbol {name}"] += 1
+            return 0.0
         return sym
 
     def _hand_key_cached(self):
@@ -480,19 +516,17 @@ class Runtime:
             return self._c(a[1]), False
         if k == "fixed":
             name = a[1]
-            ident = self.identifier
-            return (lambda: ident(name)), False
+            return (lambda: _tls.ident(name)), False
         if k == "raiseto":
             return self._c(a[1]), False
         if k == "raiseby":
             e = self._c(a[1])
-            ident = self.identifier
-            return (lambda: ident("ncallbets") + e()), False
+            return (lambda: _tls.ident("ncallbets") + e()), False
         if k == "raisepct":
             e = self._c(a[1])
-            ident = self.identifier
 
             def pct():
+                ident = _tls.ident
                 bet = ident("bet")
                 pot_after_call = (ident("pot") / bet if bet > 0 else 0.0) + ident("nbetstocall")
                 return ident("ncallbets") + 0.01 * e() * pot_after_call
@@ -507,29 +541,33 @@ class Runtime:
 
     def _c_when(self, groups, default_name):
         compiled = []
+        idx = 0
         for guard, clauses in groups:
             g = self._c(guard) if guard is not None else None
             cl = []
             for cond, action in clauses:
                 fn, is_set = self._c_action(action)
-                cl.append((self._c(cond), fn, is_set))
+                cl.append((self._c(cond), fn, is_set, idx))
+                idx += 1
             compiled.append((g, cl))
         if default_name and default_name in self.objects:
-            evaluate = self.evaluate
-            end = lambda: evaluate(default_name)
+            end = lambda: _tls.ident(default_name)
         else:
             end = lambda: 0.0
+        rt = self
 
         def run():
             for g, cl in compiled:
                 if g is not None and not g():
                     continue
-                for cond, fn, is_set in cl:
+                for cond, fn, is_set, ridx in cl:
                     if cond():
                         if is_set:
                             fn()
                             continue
+                        rt.last_rule_idx = ridx
                         return fn()
+            rt.last_rule_idx = -1
             return end()
         return run
 
@@ -651,9 +689,11 @@ class _CodeGen:
             out.append(self.expr(n))
 
     def function(self, tree, name):
+        rt_name = self.bind(self.rt, "rt")
         lines = ["def _f():"]
         if tree[0] == "when":
             groups, default_name = tree[1], tree[2]
+            idx = 0
             for guard, clauses in groups:
                 ind = "    "
                 if guard is not None:
@@ -665,14 +705,22 @@ class _CodeGen:
                     fn, is_set = self.rt._c_action(action)
                     a = self.bind(fn, "a")
                     lines.append(f"{ind}if {self.expr(cond)}:")
-                    lines.append(f"{ind}    {a}()" if is_set else f"{ind}    return {a}()")
+                    if is_set:
+                        lines.append(f"{ind}    {a}()")
+                    else:
+                        lines.append(f"{ind}    {rt_name}.last_rule_idx={idx}")
+                        lines.append(f"{ind}    return {a}()")
+                    idx += 1
             if default_name and default_name in self.rt.objects:
-                ev = self.bind(self.rt.evaluate, "e")
-                lines.append(f"    return {ev}({default_name!r})")
+                ident_fn = self.bind(lambda n: _tls.ident(n), "e")
+                lines.append(f"    {rt_name}.last_rule_idx=-1")
+                lines.append(f"    return {ident_fn}({default_name!r})")
             else:
+                lines.append(f"    {rt_name}.last_rule_idx=-1")
                 lines.append("    return 0.0")
         else:
             lines.append(f"    return {self.expr(tree)}")
-        code = compile("\n".join(lines), f"<openppl {name}>", "exec")
+        source = "\n".join(lines)
+        code = compile(source, f"<openppl {name}>", "exec")
         exec(code, self.ns)
         return self.ns["_f"]

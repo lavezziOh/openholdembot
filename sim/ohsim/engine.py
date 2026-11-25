@@ -46,6 +46,7 @@ class Seat:
     invested: float = 0.0        # whole hand
     acted: bool = False          # acted since the last full raise
     start_stack: float = 0.0     # stack at hand start
+    sitting_out: bool = False    # temporarily away from the table
 
 
 class Table:
@@ -94,9 +95,13 @@ class Table:
     def next_chair(self, c, cond=lambda s: True):
         for i in range(1, self.n + 1):
             j = (c + i) % self.n
-            if cond(self.seats[j]):
+            if not self.seats[j].sitting_out and cond(self.seats[j]):
                 return j
         return None
+
+    @property
+    def n_active_seats(self):
+        return sum(1 for s in self.seats if not s.sitting_out)
 
     def active(self):
         return [s for s in self.seats if s.in_hand and not s.folded]
@@ -135,6 +140,13 @@ class Table:
         self.board = []
         self.street = PREFLOP
         for s in self.seats:
+            if s.sitting_out:
+                s.hole = []
+                s.in_hand, s.folded, s.allin = False, True, False
+                s.bet = s.invested = 0.0
+                s.acted = False
+                s.start_stack = s.stack
+                continue
             s.hole = [deck.pop() for _ in range(self.n_hole)]
             s.in_hand, s.folded, s.allin = True, False, False
             s.bet = s.invested = 0.0
@@ -142,19 +154,21 @@ class Table:
             s.start_stack = s.stack
         self.deck = deck
         # blinds (heads-up: dealer posts the small blind)
-        if self.n == 2:
+        if self.n_active_seats == 2:
             self.sb_chair = self.dealer
         else:
             self.sb_chair = self.next_chair(self.dealer)
         self.bb_chair = self.next_chair(self.sb_chair)
         if self.ante > 0:
             for s in self.seats:
-                self._put(s, min(self.ante, s.stack), "ante", ante=True)
+                if not s.sitting_out:
+                    self._put(s, min(self.ante, s.stack), "ante", ante=True)
         self._put(self.seats[self.sb_chair], min(self.sb, self.seats[self.sb_chair].stack), "sb")
         self._put(self.seats[self.bb_chair], min(self.bb, self.seats[self.bb_chair].stack), "bb")
         self.last_raise = self.bb
         for s in self.seats:
-            s.player.start_hand(self.view(s.chair))
+            if not s.sitting_out:
+                s.player.start_hand(self.view(s.chair))
         first = self.next_chair(self.bb_chair)
         if self._betting_round(first):
             for street, ncards in ((FLOP, 3), (TURN, 1), (RIVER, 1)):

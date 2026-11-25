@@ -62,7 +62,7 @@ class SymbolProvider:
         self.hands_played = 0
         self.stats = stats              # shared PlayerStats (for pt_ symbols), optional
         self.prwin_opponents_fn = None  # callable returning f$prwin_number_of_opponents
-        self.range_model = None
+        self.range_model = None         # ohsim.ranges.PlayerModel shared by the table (dll$prwin_range)
         self._prwin_cache = {}
         self.random_hand = self.rng.random()
         self.random_round = self.rng.random()
@@ -272,6 +272,16 @@ class SymbolProvider:
         if name == "firstraiserchair":
             r = self._raisers()
             return r[0] if r else -1
+        if name == "dealpositionlastraiser":
+            r = self._raisers()
+            if not r and t.street == PREFLOP:
+                chair = t.bb_chair
+            elif r:
+                chair = r[-1]
+            else:
+                return 0
+            order = self._order("dealpos")
+            return order.index(chair) + 1 if chair in order else 0
         if name in ("firstcallerchair", "lastcallerchair"):
             calls = self._callers()
             if not calls:
@@ -322,6 +332,80 @@ class SymbolProvider:
             return me.invested
         if name in ("maxbalance",):
             return max(s.stack for s in t.seats)
+        # ---- OpenPPL aliases (amounts in big blinds, position booleans)
+        if name == "stacksize":
+            return me.stack / bb
+        if name == "startingstacksize":
+            return me.start_stack / bb
+        if name == "stacksizeatbeginningofcurrentround":
+            return (me.stack + me.bet) / bb
+        if name == "amounttocall":
+            return min(cb - me.bet, me.stack) / bb
+        if name == "opponents":
+            return len([s for s in t.active() if s.chair != me.chair])
+        if name == "opponentsstacksizeheadsup":
+            opp = [s for s in t.active() if s.chair != me.chair]
+            return opp[0].stack / bb if len(opp) == 1 else 0
+        if name in ("insmallblind",):
+            return 1.0 if me.chair == t.sb_chair else 0.0
+        if name in ("inbigblind",):
+            return 1.0 if me.chair == t.bb_chair else 0.0
+        if name in ("inbutton",):
+            return 1.0 if me.chair == t.dealer else 0.0
+        if name in ("incutoff",):
+            p = self._positions()
+            return 1.0 if me.chair == p.get("cutoffchair", -1) else 0.0
+        if name in ("inlateposition",):
+            p = self._positions()
+            return 1.0 if me.chair in (t.dealer, p.get("cutoffchair", -1)) else 0.0
+        if name in ("inmiddleposition",):
+            p = self._positions()
+            return 1.0 if me.chair in (p.get("mp1chair",-1), p.get("mp2chair",-1), p.get("mp3chair",-1)) else 0.0
+        if name in ("inearlyposition",):
+            p = self._positions()
+            return 1.0 if me.chair in (p.get("ep1chair",-1), p.get("ep2chair",-1), p.get("ep3chair",-1), p.get("utgchair",-1)) else 0.0
+        if name == "raises":
+            return len([h for h in self._street_records() if h.kind in ("raise", "bet")])
+        if name == "calls":
+            return len([h for h in self._street_records() if h.kind == "call"])
+        if name == "checks":
+            return len([h for h in self._street_records() if h.kind == "check"])
+        if name == "bets":
+            return len([h for h in self._street_records() if h.kind == "bet"])
+        if name == "folds":
+            return len([h for h in self._street_records() if h.kind == "fold"])
+        if name == "botslastaction":
+            pa = self.prevaction
+            return pa if pa != -2 else 0
+        if name == "botslastpreflopaction":
+            _PREFLOP = 1  # engine.PREFLOP = 1
+            for code, count in self.own.get(_PREFLOP, {}).items():
+                if count > 0:
+                    return {"fold": -1, "check": 0, "call": 1, "raise": 2, "betsize": 3, "betpot": 3, "allin": 4}.get(code, 0)
+            return 0
+        if name == "botsactionsonthistround" or name == "botsactionsonthistroundincludingchecks":
+            st = t.street
+            return sum(self.own.get(st, {}).values())
+        if name == "numberofopponentsallin":
+            return len([s for s in t.active() if s.allin and s.chair != me.chair])
+        if name == "stilltoactnumber" or name == "stilltoact":
+            recs = self._street_records()
+            acted = {h.chair for h in recs}
+            return len([s for s in t.active() if s.chair not in acted and s.chair != me.chair])
+        if name == "raisessincelastplay":
+            recs = self._street_records()
+            last = max((i for i, h in enumerate(recs) if h.chair == me.chair), default=-1)
+            return len([h for h in recs[last+1:] if h.kind in ("raise", "bet")])
+        if name in ("others",):
+            return 1.0
+        if name in ("none",):
+            return 0.0
+        if name in ("call_openppl",):
+            return 1.0
+        if name in ("raise_openppl", "raiseto"):
+            return 2.0
+        if name in ("raisemax",):
+            return 3.0
         # ---- players
         dealt = self._seats_dealt()
         active = t.active()
@@ -584,8 +668,48 @@ class SymbolProvider:
         raise KeyError(name)
 
     def _dll(self, name):
-        """Symbols that OpenHoldem gets from a user DLL: not provided by the simulator
-        (reported as missing at the end of the run, value 0 like in OpenHoldem without the DLL)."""
+        """Symbols that OpenHoldem would get from a user DLL (here computed by the simulator).
+        dll$prwin_range: win probability against the ranges of the live opponents (ohsim.ranges);
+        dll$range_opponents: number of live opponents used."""
+        from . import ranges
+        me = self.view.me
+        t = self.t
+        if name == "dll$range_opponents":
+            return float(len([s for s in t.seats if s.in_hand and not s.folded and s is not me]))
+        if name == "dll$prwin_range":
+            model = self.range_model or ranges.PlayerModel()
+            W = ranges.opponent_ranges(t, me.chair, model, me.hole)
+            if not W:
+                return 1.0
+            return ranges.equity(me.hole, list(t.board), list(W.values()), iters=400, rng=self.rng)
+        if name == "dll$range_eq_raise":
+            key = (t.hand_no, len(t.history), me.chair)
+            if getattr(self, "_raise_key", None) != key:
+                model = self.range_model or ranges.PlayerModel()
+                self._raise_eq = ranges.raise_equity(t, me.chair, model, me.hole, rng=self.rng)
+                self._raise_key = key
+            return self._raise_eq
+        if name == "dll$prwin_oh":
+            # OpenHoldem's own weighted prwin, at its best: willplay = mean VPIP of the live opponents (HUD),
+            # wontplay = VPIP + 10 points, the same range for every opponent, no change after preflop
+            model = self.range_model or ranges.PlayerModel()
+            live = [s for s in t.seats if s.in_hand and not s.folded and s is not me]
+            if not live:
+                return 1.0
+            v = sum(model.vpip(s.name) for s in live) / len(live)
+            w = ranges.oh_weights(ranges.oh_classes(v), ranges.oh_classes(min(1.0, v + 0.10)), len(live),
+                                  dead=list(me.hole) + list(t.board))
+            return ranges.equity(me.hole, list(t.board), [w] * len(live), iters=400, rng=self.rng)
+        if name in ("dll$range_fold", "dll$range_eq_call", "dll$range_eq_now", "dll$range_bet_gain"):
+            # bet outlook, cached per decision (same hand, same history length)
+            key = (t.hand_no, len(t.history), me.chair)
+            if getattr(self, "_outlook_key", None) != key:
+                model = self.range_model or ranges.PlayerModel()
+                self._outlook = ranges.bet_outlook(t, me.chair, model, me.hole, rng=self.rng)
+                self._outlook_key = key
+            fold, eq_call, eq_now, gain = self._outlook
+            return {"dll$range_fold": fold, "dll$range_eq_call": eq_call, "dll$range_eq_now": eq_now,
+                    "dll$range_bet_gain": gain}[name]
         self.missing[name] += 1
         return 0.0
 

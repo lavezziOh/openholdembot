@@ -98,14 +98,10 @@ def write_pt_file(path, ps, groups):
 
 
 def write_pt_csv(path, ps, groups, stats, defs):
-    """Same table as a CSV for Excel (Italian/European settings: ';' separator, ',' decimals, UTF-8 BOM).
-    Per player: value (% or factor), times, opportunities; empty = no opportunity / not computable."""
+    """CSV for Excel: one value per player (% with symbol, AF as factor). Delimiter ';', UTF-8 BOM."""
     import csv
-    num_ = lambda x, d=1: (f"{x:.{d}f}").replace(".", ",")
-    header = ["stat", "gruppo"]
-    for g in groups:
-        header += [f"{g} valore", f"{g} volte", f"{g} occasioni"]
-    header.append("descrizione")
+    num_ = lambda x, d=1: f"{x:.{d}f}"
+    header = ["stat", "gruppo"] + [g for g in groups] + ["descrizione"]
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f, delimiter=";")
         w.writerow(header)
@@ -114,19 +110,20 @@ def write_pt_csv(path, ps, groups, stats, defs):
             for g in groups:
                 if (g, s) in ps and ps[(g, s)][1]:
                     num, den = ps[(g, s)]
-                    val = num / den if s.endswith("_af") else 100 * num / den
-                    row += [num_(val, 2 if s.endswith("_af") else 1), f"{num:.0f}", f"{den:.0f}"]
+                    is_af = s.endswith("_af")
+                    val = num / den if is_af else 100 * num / den
+                    row.append(num_(val, 2 if is_af else 1) + ("" if is_af else "%"))
                 elif (g, "#" + s) in ps:
-                    row += [f"{ps[(g, '#' + s)][0]:.0f}", "", ""]
+                    row.append(f"{ps[(g, '#' + s)][0]:.0f}")
                 else:
-                    row += ["", "", ""]
+                    row.append("")
             row.append(defs[s].get("description", ""))
             w.writerow(row)
 from .hhexport import export_hand
 from .report import preflop_stats, format_report, line_stats, format_lines
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OH_REPO = os.path.normpath(os.path.join(HERE, "..", ".."))   # sim/ is inside the OpenHoldem repository
+OH_REPO = os.path.normpath(os.path.join(HERE, "..", "..", "openholdembot"))
 DEFAULT_LIB = os.path.join(OH_REPO, "OpenPPL", "OpenPPL_Library")
 DEFAULT_BOT = os.path.join(OH_REPO, "##_OpenHoldem_Release_Directory_##", "bot_logic", "DefaultBot")
 # release layout: OpenPPL_Library and DefaultBot shipped next to the program (source zip or .exe folder)
@@ -181,10 +178,20 @@ def play_block(cfg, k, hands):
                   max_stack=tcfg.get("max_stack", 3 * tcfg.get("buyin", 100.0)) or None,
                   rake=tcfg.get("rake", 0.0), rake_cap=tcfg.get("rake_cap", 0.0),
                   game=tcfg.get("game", "nlhe"))
+    # opponent ranges for dll$prwin_range: statistics learnt from the public actions of this table
     range_model = None
+    uses_ranges = any(i in ("dll$prwin_range", "dll$prwin_oh") or i.startswith("dll$range_") for b in bots for o in b.rt.objects.values()
+                      if not o.is_list and o.tree is not None for i in walk_identifiers(o.tree))
+    if uses_ranges or tcfg.get("range_model"):
+        from .ranges import PlayerModel
+        range_model = PlayerModel()
+        for b in bots:
+            b.provider.range_model = range_model
     vpip, pfr, dealt = Counter(), Counter(), Counter()
     pos_stats = Counter()
     lines = {}
+    pairwise = Counter()
+    pairwise_n = Counter()
     rep = cfg.get("report", {})
     hh_file = None
     if rep.get("hh"):
@@ -202,7 +209,19 @@ def play_block(cfg, k, hands):
     # Seats are shuffled at the end of every orbit (default on, "shuffle_seats = false" to keep them fixed).
     # Separate generator: the cards dealt are the same with or without shuffling.
     seat_rng = random.Random(seed * 7919 + 13) if tcfg.get("shuffle_seats", True) else None
+    # Short-handed: X% of hands are played with fewer players (uniform across 2..N)
+    shorthanded_pct = tcfg.get("shorthanded_pct", 0.0) / 100.0
+    sh_rng = random.Random(seed * 3571 + 7) if shorthanded_pct > 0 else None
     for _ in range(hands):
+        # decide how many players sit this hand
+        if sh_rng is not None and table.n > 2 and sh_rng.random() < shorthanded_pct:
+            n_sit = sh_rng.randint(2, table.n - 1)
+            sitting = sh_rng.sample(range(table.n), table.n - n_sit)
+            for s in table.seats:
+                s.sitting_out = s.chair in sitting
+        else:
+            for s in table.seats:
+                s.sitting_out = False
         res = table.play_hand()
         if hh_file:
             when = hh_epoch + datetime.timedelta(seconds=40 * table.hand_no) if hh_epoch else None
@@ -212,18 +231,27 @@ def play_block(cfg, k, hands):
         if range_model is not None:
             range_model.add_hand(table)
         pos_stats.update(preflop_stats(table))
+        contestants = [s for s in table.seats if not s.sitting_out and not s.folded]
+        if len(contestants) == 2 and table.board_seen_flop:
+            a, b_ = contestants
+            da = res["payouts"][a.chair] - a.invested
+            for pair in ((a.name, b_.name), (b_.name, a.name)):
+                pairwise[pair] += da if pair[0] == a.name else -da
+                pairwise_n[pair] += 1
         for key_, (n_, v_) in line_stats(table, res).items():
             a_ = lines.setdefault(key_, [0, 0.0]); a_[0] += n_; a_[1] += v_
         pre = [r for r in table.history if r.street == PREFLOP]
         for s in table.seats:
+            if s.sitting_out:
+                continue
             dealt[s.name] += 1
             mine = [r.kind for r in pre if r.chair == s.chair]
             if "call" in mine or "raise" in mine or "bet" in mine:
                 vpip[s.name] += 1
             if "raise" in mine or "bet" in mine:
                 pfr[s.name] += 1
-        if seat_rng is not None and table.hand_no % table.n == 0:
-            table.shuffle_seats(seat_rng)           # end of an orbit: new seating
+        if seat_rng is not None and table.hand_no % table.n == 0 and table.n_active_seats > 2:
+            table.shuffle_seats(seat_rng)           # end of an orbit: new seating (skip when HU)
         pending += 1
         if _progress is not None and pending == PROGRESS_STEP:
             with _progress.get_lock():
@@ -247,6 +275,7 @@ def play_block(cfg, k, hands):
         "pt": _pt_totals(stats),
         "load_errors": {b.name: b.load_errors for b in bots} if k == 0 else {},
         "bb": table.bb, "rake": table.rake_total,
+        "pairwise": pairwise, "pairwise_n": pairwise_n,
     }
 
 
@@ -288,7 +317,8 @@ def run(cfg, out=print, workers=None):
     el = time.time() - t0
 
     total = {"results": Counter(), "vpip": Counter(), "pfr": Counter(), "dealt": Counter(),
-             "missing": Counter(), "errors": Counter(), "positions": Counter()}
+             "missing": Counter(), "errors": Counter(), "positions": Counter(),
+             "pairwise": Counter(), "pairwise_n": Counter()}
     decisions = {}
     for b in blocks:
         for key in total:
@@ -316,6 +346,16 @@ def run(cfg, out=print, workers=None):
         top = ", ".join(f"{k}:{v}" for k, v in decisions[n].most_common(6))
         out(f"{n:<16}{net:>10.1f}{net / hands * 100:>10.1f}"
             f"{100 * total['vpip'][n] / dealt:>7.1f}%{100 * total['pfr'][n] / dealt:>7.1f}%  {top}")
+    if total["pairwise_n"]:
+        out(f"\n{'':>16}  head-to-head postflop (HU pots only)")
+        out(f"{'player':<16}{'vs':<16}{'pots':>6}{'net bb':>10}{'bb/pot':>10}")
+        for n in names:
+            rows = [(opp, total["pairwise"][(n, opp)], total["pairwise_n"][(n, opp)])
+                    for opp in names if opp != n and total["pairwise_n"][(n, opp)] > 0]
+            rows.sort(key=lambda r: r[1] / r[2] if r[2] else 0)
+            for opp, net_chips, npots in rows:
+                net_bb = net_chips / bb
+                out(f"{n:<16}{opp:<16}{npots:>6}{net_bb:>10.1f}{net_bb / npots:>10.2f}")
     if cfg.get("report", {}).get("positions", True):
         import re
         grp = lambda n: re.sub(r"_\d+$", "", n)        # Rev025_1, Rev025_2 -> Rev025
