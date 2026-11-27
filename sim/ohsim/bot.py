@@ -8,11 +8,15 @@ Life-cycle (OpenHoldem CSymbolEngineOpenPPL / CAutoplayerFunctions):
 """
 import hashlib
 import os
+import pickle
+import psutil
 from collections import Counter
 
 from .engine import Action, FOLD, CHECK, CALL, RAISE
 from .oppl.runtime import Runtime
 from .symbols import SymbolProvider
+
+_PICKLE_DIR = os.path.join(os.path.dirname(__file__), "..", "cache")
 
 MAIN = {1: "f$preflop", 2: "f$flop", 3: "f$turn", 4: "f$river"}
 FALLBACK = {1: "f$preflop", 2: "f$FHandStrenght", 3: "f$THandStrenght", 4: "f$RHandStrenght"}
@@ -44,6 +48,45 @@ def _path_hash(*paths):
     return h.hexdigest()
 
 
+def _pickle_path(key):
+    os.makedirs(_PICKLE_DIR, exist_ok=True)
+    return os.path.join(_PICKLE_DIR, f"{key}.pkl")
+
+
+def _check_memory(profile, n_bots=1):
+    """Warn if loading would likely exhaust RAM."""
+    if profile and os.path.isfile(profile):
+        pkl_mb = os.path.getsize(profile) / 1024 / 1024
+        estimated_mb = pkl_mb * 5 * n_bots
+        avail_mb = psutil.virtual_memory().available / 1024 / 1024
+        if estimated_mb > avail_mb * 0.8:
+            raise MemoryError(
+                f"RAM insufficiente: profilo {os.path.basename(profile)} "
+                f"richiede ~{estimated_mb:.0f} MB per {n_bots} bot, "
+                f"ma solo {avail_mb:.0f} MB disponibili. "
+                f"Chiudi altri programmi o usa un profilo piu leggero.")
+
+
+def _load_pickle(key):
+    p = _pickle_path(key)
+    if os.path.exists(p):
+        try:
+            with open(p, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            pass
+    return None
+
+
+def _save_pickle(key, data):
+    p = _pickle_path(key)
+    try:
+        with open(p, "wb") as f:
+            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception as e:
+        print(f"[pickle] save failed: {e}")
+
+
 class OpenPPLBot:
     def __init__(self, name, profile, openppl_dir, default_bot_dir=None,
                  custom_library=None, prwin_iterations=400, seed=None, stats=None):
@@ -55,29 +98,40 @@ class OpenPPLBot:
         prof_hash = _path_hash(profile) if profile else "none"
         full_key = (base_hash, prof_hash)
 
+        if full_key not in _FULL_CACHE:
+            _check_memory(profile)
+
         cached = _FULL_CACHE.get(full_key)
         if cached is not None:
-            self.rt.objects = dict(cached[0])
+            self.rt.objects = cached[0]
             self.rt.errors = list(cached[1])
-            self.rt.compiled = dict(cached[2])
+            self.rt.compiled = cached[2]
         else:
-            base = _BASE_CACHE.get(base_hash)
-            if base is not None:
-                self.rt.objects = dict(base[0])
-                self.rt.errors = list(base[1])
+            pkl_key = f"{base_hash}_{prof_hash}"
+            pkl_data = _load_pickle(pkl_key)
+            if pkl_data is not None:
+                self.rt.objects = pkl_data[0]
+                self.rt.errors = list(pkl_data[1])
+                self.rt.compiled = pkl_data[2]
             else:
-                self.rt.load_standard(openppl_dir, default_bot_dir, custom_library)
-                _BASE_CACHE.clear()
-                _BASE_CACHE[base_hash] = (dict(self.rt.objects), list(self.rt.errors))
-            if profile:
-                self.rt.load_file(profile)
-            self.rt.finish_loading(validate=True)
-            for fn_name in list(MAIN.values()) + list(FALLBACK.values()) + list(DEFAULT.values()):
-                o = self.rt.objects.get(fn_name)
-                if o is not None and not o.is_list and fn_name not in self.rt.compiled:
-                    self.rt.compiled[fn_name] = self.rt._compile_function(o)
+                base = _BASE_CACHE.get(base_hash)
+                if base is not None:
+                    self.rt.objects = dict(base[0])
+                    self.rt.errors = list(base[1])
+                else:
+                    self.rt.load_standard(openppl_dir, default_bot_dir, custom_library)
+                    _BASE_CACHE.clear()
+                    _BASE_CACHE[base_hash] = (dict(self.rt.objects), list(self.rt.errors))
+                if profile:
+                    self.rt.load_file(profile)
+                self.rt.finish_loading(validate=True)
+                for fn_name in list(MAIN.values()) + list(FALLBACK.values()) + list(DEFAULT.values()):
+                    o = self.rt.objects.get(fn_name)
+                    if o is not None and not o.is_list and fn_name not in self.rt.compiled:
+                        self.rt.compiled[fn_name] = self.rt._compile_function(o)
+                _save_pickle(pkl_key, (self.rt.objects, list(self.rt.errors), self.rt.compiled))
             _FULL_CACHE.clear()
-            _FULL_CACHE[full_key] = (dict(self.rt.objects), list(self.rt.errors), dict(self.rt.compiled))
+            _FULL_CACHE[full_key] = (self.rt.objects, list(self.rt.errors), self.rt.compiled)
         self.load_errors = list(self.rt.errors)
         self.provider.prwin_opponents_fn = (
             (lambda: self.rt.evaluate("f$prwin_number_of_opponents"))

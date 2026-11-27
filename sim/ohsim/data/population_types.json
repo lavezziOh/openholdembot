@@ -1,0 +1,113 @@
+{
+ "min_hands": 100,
+ "players": 435,
+ "hands": 93558,
+ "source": "PT4 DB, real money NL4-NL10, villain only, 2026-11-23",
+ "types": {
+  "reg": {
+   "players": 326,
+   "share_players": 0.749,
+   "share_hands": 0.793,
+   "pooled": {
+    "vpip": 0.2356,
+    "pfr": 0.1460,
+    "rfi": 0.2757,
+    "3bet": 0.0801,
+    "fold_to_3bet": 0.7763,
+    "steal_attempt": 0.3347,
+    "bb_fold_to_steal": 0.6315,
+    "sb_fold_to_steal": 0.8253,
+    "flop_cbet": 0.5940,
+    "flop_fold_to_cbet": 0.4374,
+    "turn_fold_to_cbet": 0.4339,
+    "total_af": 2.8464,
+    "wtsd": 0.2887,
+    "wssd": 0.5419
+   }
+  },
+  "nit": {
+   "players": 69,
+   "share_players": 0.159,
+   "share_hands": 0.133,
+   "pooled": {
+    "vpip": 0.1507,
+    "pfr": 0.0901,
+    "rfi": 0.1708,
+    "3bet": 0.0569,
+    "fold_to_3bet": 0.8428,
+    "steal_attempt": 0.2281,
+    "bb_fold_to_steal": 0.7048,
+    "sb_fold_to_steal": 0.9011,
+    "flop_cbet": 0.5237,
+    "flop_fold_to_cbet": 0.5001,
+    "turn_fold_to_cbet": 0.4408,
+    "total_af": 2.3160,
+    "wtsd": 0.3016,
+    "wssd": 0.5586
+   }
+  },
+  "lag": {
+   "players": 22,
+   "share_players": 0.051,
+   "share_hands": 0.047,
+   "pooled": {
+    "vpip": 0.3218,
+    "pfr": 0.2168,
+    "rfi": 0.3842,
+    "3bet": 0.1078,
+    "fold_to_3bet": 0.6856,
+    "steal_attempt": 0.4677,
+    "bb_fold_to_steal": 0.5443,
+    "sb_fold_to_steal": 0.8057,
+    "flop_cbet": 0.5954,
+    "flop_fold_to_cbet": 0.3769,
+    "turn_fold_to_cbet": 0.3805,
+    "total_af": 2.5639,
+    "wtsd": 0.3032,
+    "wssd": 0.5654
+   }
+  },
+  "fish": {
+   "players": 12,
+   "share_players": 0.028,
+   "share_hands": 0.017,
+   "pooled": {
+    "vpip": 0.4717,
+    "pfr": 0.0693,
+    "rfi": 0.4979,
+    "3bet": 0.0328,
+    "fold_to_3bet": 0.7007,
+    "steal_attempt": 0.1371,
+    "bb_fold_to_steal": 0.4291,
+    "sb_fold_to_steal": 0.4190,
+    "flop_cbet": 0.7989,
+    "flop_fold_to_cbet": 0.4901,
+    "turn_fold_to_cbet": 0.4514,
+    "total_af": 1.8265,
+    "wtsd": 0.3093,
+    "wssd": 0.5745
+   }
+  },
+  "maniac": {
+   "players": 6,
+   "share_players": 0.014,
+   "share_hands": 0.009,
+   "pooled": {
+    "vpip": 0.5981,
+    "pfr": 0.3236,
+    "rfi": 0.6284,
+    "3bet": 0.1821,
+    "fold_to_3bet": 0.4802,
+    "steal_attempt": 0.5662,
+    "bb_fold_to_steal": 0.3218,
+    "sb_fold_to_steal": 0.4727,
+    "flop_cbet": 0.5010,
+    "flop_fold_to_cbet": 0.5076,
+    "turn_fold_to_cbet": 0.4881,
+    "total_af": 4.2288,
+    "wtsd": 0.3191,
+    "wssd": 0.3152
+   }
+  }
+ }
+}
