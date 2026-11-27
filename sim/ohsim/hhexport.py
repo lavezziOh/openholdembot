@@ -167,3 +167,126 @@ def export_hand(t, result, hand_id, table_name="ohsim", hero=None, when=None):
         else:
             L.append(f"{head} collected ({money(payouts[s.chair])})")
     return "\n".join(L) + "\n\n\n"
+
+
+def export_tournament_hand(t, result, hand_id, tournament_id, buyin, level_no, table_name=None,
+                           hero=None, when=None):
+    """Export a hand in PokerStars *tournament* format, importable in PokerTracker 4.
+
+    *buyin* is the total buy-in in $. *level_no* is 1-based (roman numeral in header).
+    """
+    seats = t.seats
+    seatno = {s.chair: s.chair + 1 for s in seats}
+    when = when or EPOCH + datetime.timedelta(seconds=40 * hand_id)
+    game = "Omaha Pot Limit" if getattr(t, "game", "nlhe") == "plo" else "Hold'em No Limit"
+    roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
+             "XI", "XII", "XIII", "XIV", "XV"]
+    lvl = roman[min(level_no - 1, len(roman) - 1)] if level_no <= len(roman) else str(level_no)
+    tbl = table_name or f"{tournament_id} 1"
+
+    L = [f"PokerStars Hand #{hand_id}: Tournament #{tournament_id},"
+         f" ${buyin:.2f}+$0.00 {game}"
+         f" - Level {lvl} ({int(t.sb)}/{int(t.bb)})"
+         f" - {when:%Y/%m/%d %H:%M:%S} ET",
+         f"Table '{tbl}' {t.n}-max Seat #{seatno[t.dealer]} is the button"]
+    for s in seats:
+        if not s.sitting_out:
+            L.append(f"Seat {seatno[s.chair]}: {s.name} ({int(s.start_stack)} in chips)")
+
+    inv = sorted((s.invested for s in seats if not s.sitting_out), reverse=True)
+    active_seats = [s for s in seats if not s.sitting_out]
+    top = max(active_seats, key=lambda s: s.invested)
+    uncalled = round(inv[0] - inv[1], 2) if len(inv) > 1 else 0.0
+    unc_street = None
+    if uncalled > 0:
+        aggr = [h for h in t.history if h.chair == top.chair and h.kind in ("raise", "bet", "sb", "bb")]
+        unc_street = aggr[-1].street if aggr else PREFLOP
+
+    folded_on = {}
+    hist = t.history
+
+    def chips(x):
+        x = round(x + 1e-9, 2)
+        return f"{x:.0f}" if abs(x - round(x)) < 1e-9 else f"{x:.2f}"
+
+    for street in (PREFLOP, FLOP, TURN, RIVER):
+        if street == FLOP and len(t.board) >= 3:
+            L.append(f"*** FLOP *** [{cards(t.board[:3])}]")
+        elif street == TURN and len(t.board) >= 4:
+            L.append(f"*** TURN *** [{cards(t.board[:3])}] [{card(t.board[3])}]")
+        elif street == RIVER and len(t.board) >= 5:
+            L.append(f"*** RIVER *** [{cards(t.board[:4])}] [{card(t.board[4])}]")
+        elif street != PREFLOP:
+            break
+        street_max = 0.0
+        for h in (h for h in hist if h.street == street):
+            nm = seats[h.chair].name
+            allin = " and is all-in" if h.allin else ""
+            if h.kind == "ante":
+                L.append(f"{nm}: posts the ante {chips(h.added)}{allin}")
+                continue
+            if h.kind == "sb":
+                L.append(f"{nm}: posts small blind {chips(h.added)}{allin}")
+            elif h.kind == "bb":
+                L.append(f"{nm}: posts big blind {chips(h.added)}{allin}")
+            elif h.kind == "fold":
+                L.append(f"{nm}: folds")
+                folded_on[h.chair] = street
+            elif h.kind == "check":
+                L.append(f"{nm}: checks")
+            elif h.kind == "call":
+                L.append(f"{nm}: calls {chips(h.added)}{allin}")
+            elif h.kind == "bet":
+                L.append(f"{nm}: bets {chips(h.to)}{allin}")
+            elif h.kind == "raise":
+                L.append(f"{nm}: raises {chips(h.to - street_max)} to {chips(h.to)}{allin}")
+            street_max = max(street_max, h.to)
+            if street == PREFLOP and h.kind == "bb":
+                L.append("*** HOLE CARDS ***")
+                if hero:
+                    for s in active_seats:
+                        if s.name == hero:
+                            L.append(f"Dealt to {s.name} [{cards(s.hole)}]")
+        if street == PREFLOP and not any(h.kind == "bb" for h in hist):
+            L.append("*** HOLE CARDS ***")
+        if unc_street == street:
+            L.append(f"Uncalled bet ({chips(uncalled)}) returned to {top.name}")
+
+    payouts = dict(result["payouts"])
+    if uncalled > 0:
+        payouts[top.chair] = round(payouts[top.chair] - uncalled, 2)
+    active = [s for s in active_seats if s.in_hand and not s.folded]
+    showdown = result.get("showdown") and len(active) > 1
+    if showdown:
+        L.append("*** SHOW DOWN ***")
+        for s in active:
+            L.append(f"{s.name}: shows [{cards(s.hole)}] ({describe(best5(t, s.hole))})")
+    for s in active_seats:
+        if payouts[s.chair] > 0:
+            L.append(f"{s.name} collected {chips(payouts[s.chair])} from pot")
+    if not showdown and active:
+        L.append(f"{active[0].name}: doesn't show hand")
+
+    pot = round(sum(s.invested for s in active_seats) - uncalled, 2)
+    L.append("*** SUMMARY ***")
+    L.append(f"Total pot {chips(pot)} | Rake 0")
+    if t.board:
+        L.append(f"Board [{cards(t.board)}]")
+    for s in active_seats:
+        tag = " (button)" if s.chair == t.dealer else (
+            " (small blind)" if s.chair == t.sb_chair else (" (big blind)" if s.chair == t.bb_chair else ""))
+        head = f"Seat {seatno[s.chair]}: {s.name}{tag}"
+        if s.folded:
+            st = folded_on.get(s.chair, PREFLOP)
+            where = "before Flop" if st == PREFLOP else f"on the {STREET_NAME[st]}"
+            didnt = " (didn't bet)" if s.invested == 0 else ""
+            L.append(f"{head} folded {where}{didnt}")
+        elif showdown:
+            d = describe(best5(t, s.hole))
+            if payouts[s.chair] > 0:
+                L.append(f"{head} showed [{cards(s.hole)}] and won ({chips(payouts[s.chair])}) with {d}")
+            else:
+                L.append(f"{head} showed [{cards(s.hole)}] and lost with {d}")
+        else:
+            L.append(f"{head} collected ({chips(payouts[s.chair])})")
+    return "\n".join(L) + "\n\n\n"

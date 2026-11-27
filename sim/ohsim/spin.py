@@ -50,11 +50,15 @@ DEFAULT_HANDS_PER_LEVEL = 16  # ~2 min/level × ~8 hands/min at 3-player table
 # Single tournament
 # ---------------------------------------------------------------------------
 
-def play_tournament(bots, names, structure, hands_per_level, starting_stack, seed):
+def play_tournament(bots, names, structure, hands_per_level, starting_stack, seed,
+                    hh_file=None, tournament_id=None, buyin=0.0):
     """Play one Spin & Go tournament.
 
     Returns (placements, hands_played) where placements is {name: place}
     with 1 = winner.
+
+    If *hh_file* is an open text file, every hand is written in PokerStars
+    tournament format (importable in PokerTracker 4).
     """
     table = Table(
         bots, names=names,
@@ -66,10 +70,14 @@ def play_tournament(bots, names, structure, hands_per_level, starting_stack, see
         rake=0.0,
     )
 
+    if hh_file:
+        from .hhexport import export_tournament_hand
+
     level = 0
     hands_in_level = 0
     elim_order = []             # names, first eliminated first
     n_players = len(names)
+    hand_base = (tournament_id or 1) * 10000
 
     while True:
         # --- detect newly busted players -----------------------------------
@@ -94,8 +102,17 @@ def play_tournament(bots, names, structure, hands_per_level, starting_stack, see
         table.sb, table.bb = structure[level]
 
         # --- play one hand -------------------------------------------------
-        table.play_hand()
+        res = table.play_hand()
         hands_in_level += 1
+
+        if hh_file:
+            hh_file.write(export_tournament_hand(
+                table, res,
+                hand_id=hand_base + table.hand_no,
+                tournament_id=tournament_id or 1,
+                buyin=buyin,
+                level_no=level + 1,
+            ))
 
         # --- advance blind level ------------------------------------------
         if hands_in_level >= hands_per_level and level < len(structure) - 1:
@@ -142,11 +159,15 @@ def _ordinal(n):
     return f"{n}{s}"
 
 
-def run_spins(cfg, n_games=None, out=print):
+def run_spins(cfg, n_games=None, out=print, hh_dir=None):
     """Run *n_games* Spin & Go tournaments and print + return results.
 
     *cfg* is a dict with keys ``tournament`` (or ``table``), ``player``,
     ``paths`` — the same layout as the TOML file.
+
+    If *hh_dir* is a directory path, hand histories are saved there in
+    PokerStars tournament format (one file per tournament), importable
+    in PokerTracker 4.
 
     Returns a dict keyed by player name:
         {name: {"wins": int, "win_pct": float, "places": {1: n, 2: n, ...},
@@ -162,6 +183,10 @@ def run_spins(cfg, n_games=None, out=print):
     hands_per_level = tcfg.get("hands_per_level", DEFAULT_HANDS_PER_LEVEL)
     starting_stack = tcfg.get("starting_stack", DEFAULT_STARTING_STACK)
     base_seed = tcfg.get("seed", 1)
+    buyin = tcfg.get("buyin", 5.0)
+
+    if hh_dir:
+        os.makedirs(hh_dir, exist_ok=True)
 
     bots, names = make_bots(cfg["player"], paths, seed=base_seed)
     n_players = len(names)
@@ -175,8 +200,20 @@ def run_spins(cfg, n_games=None, out=print):
 
     for g in range(n_games):
         seed = rng.randrange(2**31)
+        tournament_id = base_seed * 100000 + g + 1
+
+        hh_file = None
+        if hh_dir:
+            hh_path = os.path.join(hh_dir, f"T{tournament_id}.txt")
+            hh_file = open(hh_path, "w", encoding="utf-8")
+
         placements, n_hands = play_tournament(bots, names, structure,
-                                              hands_per_level, starting_stack, seed)
+                                              hands_per_level, starting_stack, seed,
+                                              hh_file=hh_file,
+                                              tournament_id=tournament_id,
+                                              buyin=buyin)
+        if hh_file:
+            hh_file.close()
         total_hands += n_hands
         for name, place in placements.items():
             places[name][place] += 1

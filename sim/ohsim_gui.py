@@ -1503,6 +1503,19 @@ def gui():
 
     pay_load(BETCLIC_PAYOUTS)
 
+    # -- spin HH + buy-in
+    spin_opt = ttk.Frame(spin_frame, padding=(0, 4))
+    spin_opt.pack(fill="x")
+    spin_hh_save = tk.BooleanVar(value=False)
+    ttk.Checkbutton(spin_opt, text="Save hand histories (PT4 format)", variable=spin_hh_save).pack(side="left")
+    spin_hh_var = tk.StringVar(value=os.path.join(os.path.expanduser("~"), "Documents", "OHSim HH", "tournaments"))
+    ttk.Entry(spin_opt, textvariable=spin_hh_var, width=40).pack(side="left", padx=(6, 0))
+    ttk.Button(spin_opt, text="…", width=3,
+               command=lambda: spin_hh_var.set(filedialog.askdirectory() or spin_hh_var.get())).pack(side="left")
+    ttk.Label(spin_opt, text="  Buy-in $").pack(side="left", padx=(12, 0))
+    spin_buyin_var = tk.StringVar(value="5.00")
+    ttk.Entry(spin_opt, textvariable=spin_buyin_var, width=6).pack(side="left")
+
     # -- spin run bar
     spin_bar = ttk.Frame(spin_frame, padding=(0, 6))
     spin_bar.pack(fill="x")
@@ -1598,6 +1611,11 @@ def gui():
         from ohsim.spin import STRUCTURES
         STRUCTURES["_gui"] = structure
 
+        buyin = float(spin_buyin_var.get())
+        hh_dir = spin_hh_var.get() if spin_hh_save.get() else None
+        if hh_dir:
+            os.makedirs(hh_dir, exist_ok=True)
+
         spin_cfg = {
             "tournament": {
                 "games": n_games,
@@ -1605,6 +1623,7 @@ def gui():
                 "hands_per_level": hands_per_level,
                 "starting_stack": starting_stack,
                 "seed": seed,
+                "buyin": buyin,
             },
             "player": [{"name": p["name"], "profile": p["profile"]} for p in cfg["players"]],
             "paths": {"openppl_library": cfg["library"]},
@@ -1621,7 +1640,7 @@ def gui():
                     m = _re.match(r'\s*(\d+)/(\d+) tournaments', msg)
                     if m:
                         q.put(("progress", int(m.group(1))))
-                results = run_spins(spin_cfg, n_games=n_games, out=out)
+                results = run_spins(spin_cfg, n_games=n_games, out=out, hh_dir=hh_dir)
                 q.put(("done", results))
             except Exception as e:
                 q.put(("error", str(e)))
@@ -1672,10 +1691,13 @@ def gui():
             ), tags=(tag,))
 
         spin_prog.configure(value=n_games)
-        spin_status.set(f"{n_games:,} tournaments  ·  "
-                        f"{meta['total_hands']:,} hands  ·  "
-                        f"avg {meta['avg_hands']:.1f} hands/tourn  ·  "
-                        f"{meta['elapsed']:.1f}s")
+        msg = (f"{n_games:,} tournaments  ·  "
+               f"{meta['total_hands']:,} hands  ·  "
+               f"avg {meta['avg_hands']:.1f} hands/tourn  ·  "
+               f"{meta['elapsed']:.1f}s")
+        if spin_hh_save.get():
+            msg += f"   ·   HH saved in: {spin_hh_var.get()}"
+        spin_status.set(msg)
 
     def spin_poll():
         try:
